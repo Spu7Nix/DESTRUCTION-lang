@@ -1,10 +1,12 @@
 use std::{str::FromStr, error::Error, fmt::Display, path::PathBuf};
+use internment::LocalIntern;
 
 pub type Pattern = Vec<Value>;
+
 pub type Transformation = Vec<Pattern>;
 
 struct TopLevel {
-    exprs: Vec<Transformation>
+    transformations: Vec<Transformation>
 }
 
 #[derive(Clone)]
@@ -12,7 +14,8 @@ pub enum Value {
     Number(f64),
     String(String),
     Array(Vec<Value>),
-    Tuple(Vec<Value>)
+    Tuple(Vec<Value>),
+    Ident(LocalIntern<String>)
 }
 
 #[derive(Debug)]
