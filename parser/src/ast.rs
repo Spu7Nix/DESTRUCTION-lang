@@ -1,12 +1,12 @@
 use std::{str::FromStr, error::Error, fmt::Display, path::PathBuf};
 
-type Pattern<'a> = Vec<Value<'a>>;
+pub type Pattern<'a> = Vec<Value<'a>>;
 
 struct TopLevel<'a> {
     patts: Vec<Pattern<'a>>
 }
 
-enum Value<'a> {
+pub enum Value<'a> {
     Number(f64),
     String(String),
     Array(&'a [Value<'a>]),
@@ -26,45 +26,10 @@ impl Display for LangError {
     }
 }
 
-impl<'a> Expr for Pattern<'a> {
-    fn evaluate(&self) -> Value {
-        todo!()
-    }
-}
-
-impl<'a> Maths for Value<'a> {
-    fn add(&self, other: &Self) -> Value {
-        todo!()
-    }
-
-    fn sub(&self, other: &Self) -> Value {
-        todo!()
-    }
-
-    fn div(&self, other: &Self) -> Value {
-        todo!()
-    }
-
-    fn mul(&self, other: &Self) -> Value {
-        todo!()
-    }
-}
-
 impl FromStr for TopLevel<'_> {
     type Err = LangError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         todo!()
     }
-}
-
-trait Maths {
-    fn add(&self, other: &Self) -> Value;
-    fn sub(&self, other: &Self) -> Value;
-    fn div(&self, other: &Self) -> Value;
-    fn mul(&self, other: &Self) -> Value;
-}
-
-trait Expr {
-    fn evaluate(&self) -> Value;
 }
