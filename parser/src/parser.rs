@@ -209,7 +209,7 @@ pub enum Tokens {
     #[regex("0o[0-7](_?[0-7]+)*")]
     OctalLiteral,
     
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]+")]
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
     Ident,
 
     #[token("\n")]
@@ -218,4 +218,14 @@ pub enum Tokens {
     #[error]
     #[regex(r"[ \t\f]+", logos::skip)]
     Error,  
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+    
+    #[test]
+    fn tokens() {
+        Lexer::new(r#"*+-/_[](){}<-->;:,.? let if then else true false "uwu" 1 1.1 0b1010 0xa 0o7 a"#, None).parse();
+    }
 }
