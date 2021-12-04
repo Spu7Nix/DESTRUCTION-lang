@@ -1,14 +1,12 @@
-use core::slice::SlicePattern;
-
 use parser::ast::{Value, Pattern};
 
-impl<'a> Expr for Pattern<'a> {
+impl Expr for Pattern {
     fn evaluate(&self) -> Value {
         todo!()
     }
 }
 
-impl<'a> Maths for Value<'a> {
+impl Maths for Value {
     fn add(&self, other: &Self) -> Value {
         match (self, other) {
             (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),

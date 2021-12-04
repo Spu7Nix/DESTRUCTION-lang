@@ -1,18 +1,18 @@
 use std::{str::FromStr, error::Error, fmt::Display, path::PathBuf};
 
-pub type Pattern<'a> = Vec<Value<'a>>;
-pub type Expression<'a> = Vec<Pattern<'a>>;
+pub type Pattern = Vec<Value>;
+pub type Transformation = Vec<Pattern>;
 
-struct TopLevel<'a> {
-    exprs: Vec<Expression<'a>>
+struct TopLevel {
+    exprs: Vec<Transformation>
 }
 
 #[derive(Clone)]
-pub enum Value<'a> {
+pub enum Value {
     Number(f64),
     String(String),
-    Array(Vec<Value<'a>>),
-    Tuple(&'a [Value<'a>])
+    Array(Vec<Value>),
+    Tuple(Vec<Value>)
 }
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl Display for LangError {
     }
 }
 
-impl FromStr for TopLevel<'_> {
+impl FromStr for TopLevel {
     type Err = LangError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
