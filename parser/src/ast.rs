@@ -34,11 +34,15 @@ pub enum LangError {
     },
 }
 
+pub enum LangErrorT {
+    SyntaxError
+}
+
 impl Error for LangError {}
 
 impl Display for LangError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!("Pretty print for errors")
+        write!(f, "{:?}", self)
     }
 }
 

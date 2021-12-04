@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::ast::{TopLevel, Transformation};
+use crate::ast::{LangError, LangErrorT, TopLevel, Transformation};
 
 type Token = Sp<Tokens>;
 
@@ -49,10 +49,77 @@ impl<'a> Lexer<'a> {
             if self.peek().is_none() {
                 break;
             }
-            top_level.transformations.push(parse_transform(self));
+            top_level.transformations.push(self.parse_transform());
         }
 
         top_level
+    }
+
+    fn parse_transform(&mut self) -> Transformation {
+        let next_token = self.next_token().unwrap_or_else(|| {
+            self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input")
+        });
+
+        let first = match next_token.data {
+            Tokens::Number(n) => Transformation::Number(n),
+            Tokens::StringLiteral(s) => Transformation::String(s),
+
+            Tokens::Lbracket => {
+                let mut transforms = Vec::new();
+                loop {
+                    transforms.push(self.parse_transform());
+                    match self
+                        .next_token()
+                        .unwrap_or_else(|| {
+                            self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input");
+                        })
+                        .data
+                    {
+                        Tokens::Comma => (),
+                        Tokens::Rbracket => break,
+                        token => self.throw_error(
+                            LangErrorT::SyntaxError,
+                            &format!("Expected tokens `Rbracket` or `Comma`, found {:?}", token),
+                        ),
+                    }
+                }
+                Transformation::Array(transforms)
+            }
+
+            Tokens::Ident(s) => Transformation::Ident(s),
+
+            token => self.throw_error(
+                LangErrorT::SyntaxError,
+                &format!("Unexpected token {:?}", token),
+            ),
+        };
+
+        if let Some(Token {
+            data: Tokens::Rarrow,
+            ..
+        }) = self.peek()
+        {
+            self.next_token().unwrap_or_else(|| {
+                self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input");
+            });
+            let second = self.parse_transform();
+            Transformation::Change(first.into(), second.into())
+        } else {
+            first
+        }
+    }
+
+    pub fn throw_error(&self, error: LangErrorT, message: &str) -> ! {
+        let error = match error {
+            LangErrorT::SyntaxError => LangError::SyntaxError {
+                file: self.file.to_owned(),
+                pos: self.pos,
+                message: message.to_owned(),
+            },
+        };
+        println!("{}", error);
+
+        std::process::exit(1)
     }
 
     pub fn peek(&self) -> Option<Token> {
@@ -87,43 +154,6 @@ impl<'a> Lexer<'a> {
 
     pub(crate) fn pos(&self) -> (usize, usize) {
         self.pos
-    }
-}
-
-fn parse_transform(lexer: &mut Lexer) -> Transformation {
-    // todo: return result
-    let first = match lexer.next_token().unwrap().data {
-        Tokens::Number(n) => Transformation::Number(n),
-        Tokens::StringLiteral(s) => Transformation::String(s),
-
-        Tokens::Lbracket => {
-            let mut transforms = Vec::new();
-            loop {
-                transforms.push(parse_transform(lexer));
-                match lexer.next_token().unwrap().data {
-                    Tokens::Comma => (),
-                    Tokens::Rbracket => break,
-                    _ => panic!("Expected comma or rbracket"),
-                }
-            }
-            Transformation::Array(transforms)
-        }
-
-        Tokens::Ident(s) => Transformation::Ident(s),
-
-        a => panic!("unexpected {:?}", a),
-    };
-
-    if let Some(Token {
-        data: Tokens::Rarrow,
-        ..
-    }) = lexer.peek()
-    {
-        lexer.next_token().unwrap();
-        let second = parse_transform(lexer);
-        Transformation::Change(first.into(), second.into())
-    } else {
-        first
     }
 }
 

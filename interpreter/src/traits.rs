@@ -18,7 +18,7 @@ impl Maths for Value {
     fn add(&self, other: &Self) -> Value {
         match (self, other) {
             (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),
-            (Value::String(lhs), Value::String(rhs)) => Value::String(lhs.to_owned() + &rhs),
+            (Value::String(lhs), Value::String(rhs)) => Value::String(lhs.to_owned() + rhs),
             (Value::Array(lhs), Value::Array(rhs)) => {
                 Value::Array([lhs.to_owned(), rhs.to_owned()].concat())
             }
