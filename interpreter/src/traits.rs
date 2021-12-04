@@ -1,6 +1,14 @@
-use parser::ast::{Value, Pattern};
+use parser::ast::Transformation;
 
-impl Expr for Pattern {
+#[derive(Debug, Clone)]
+pub enum Value {
+    Number(f64),
+    String(String),
+    Array(Vec<Value>),
+    Tuple(Vec<Value>),
+}
+
+impl Expr for Transformation {
     fn evaluate(&self) -> Value {
         todo!()
     }
@@ -11,8 +19,10 @@ impl Maths for Value {
         match (self, other) {
             (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),
             (Value::String(lhs), Value::String(rhs)) => Value::String(lhs.to_owned() + &rhs),
-            (Value::Array(lhs), Value::Array(rhs)) => Value::Array([lhs.to_owned(), rhs.to_owned()].concat()),
-            _ => todo!()
+            (Value::Array(lhs), Value::Array(rhs)) => {
+                Value::Array([lhs.to_owned(), rhs.to_owned()].concat())
+            }
+            _ => todo!(),
         }
     }
 
@@ -28,7 +38,6 @@ impl Maths for Value {
         todo!()
     }
 }
-
 
 pub trait Maths {
     fn add(&self, other: &Self) -> Value;

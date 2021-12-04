@@ -1,26 +1,37 @@
-use std::{str::FromStr, error::Error, fmt::Display, path::PathBuf};
 use internment::LocalIntern;
+use std::{error::Error, fmt::Display, path::PathBuf, str::FromStr};
 
-pub type Pattern = Vec<Value>;
-
-pub type Transformation = Vec<Pattern>;
-
-struct TopLevel {
-    transformations: Vec<Transformation>
-}
-
-#[derive(Clone)]
-pub enum Value {
+#[derive(Debug)]
+pub enum Transformation {
     Number(f64),
     String(String),
-    Array(Vec<Value>),
-    Tuple(Vec<Value>),
-    Ident(LocalIntern<String>)
+    Array(Vec<Transformation>),
+    Tuple(Vec<Transformation>),
+    Ident(LocalIntern<String>),
+    Operator(Box<Transformation>, Operator, Box<Transformation>),
+    Change(Box<Transformation>, Box<Transformation>), // arrow ->
+}
+
+#[derive(Debug)]
+pub enum Operator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+#[derive(Debug)]
+pub struct TopLevel {
+    pub transformations: Vec<Transformation>,
 }
 
 #[derive(Debug)]
 pub enum LangError {
-    SyntaxError { pos: (usize, usize), message: String, file: Option<PathBuf> }
+    SyntaxError {
+        pos: (usize, usize),
+        message: String,
+        file: Option<PathBuf>,
+    },
 }
 
 impl Error for LangError {}

@@ -4,6 +4,8 @@ use std::{
     path::PathBuf,
 };
 
+use crate::ast::{TopLevel, Transformation};
+
 type Token = Sp<Tokens>;
 
 #[derive(Clone)]
@@ -38,10 +40,19 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    pub fn parse(&mut self) {
-        while let Some(token) = self.next_token() {
-            println!("{:?} {token}", self.pos);
+    pub fn parse(&mut self) -> TopLevel {
+        let mut top_level = TopLevel {
+            transformations: Vec::new(),
+        };
+
+        loop {
+            if self.peek().is_none() {
+                break;
+            }
+            top_level.transformations.push(parse_transform(self));
         }
+
+        top_level
     }
 
     pub fn peek(&self) -> Option<Token> {
@@ -52,7 +63,7 @@ impl<'a> Lexer<'a> {
         Some(Token {
             data: token,
             span: tokens.span().into(),
-        })    
+        })
     }
 
     pub fn peek_many(&self, amount: usize) -> Vec<Token> {
@@ -76,6 +87,43 @@ impl<'a> Lexer<'a> {
 
     pub(crate) fn pos(&self) -> (usize, usize) {
         self.pos
+    }
+}
+
+fn parse_transform(lexer: &mut Lexer) -> Transformation {
+    // todo: return result
+    let first = match lexer.next_token().unwrap().data {
+        Tokens::Number(n) => Transformation::Number(n),
+        Tokens::StringLiteral(s) => Transformation::String(s),
+
+        Tokens::Lbracket => {
+            let mut transforms = Vec::new();
+            loop {
+                transforms.push(parse_transform(lexer));
+                match lexer.next_token().unwrap().data {
+                    Tokens::Comma => (),
+                    Tokens::Rbracket => break,
+                    _ => panic!("Expected comma or rbracket"),
+                }
+            }
+            Transformation::Array(transforms)
+        }
+
+        Tokens::Ident(s) => Transformation::Ident(s),
+
+        a => panic!("unexpected {:?}", a),
+    };
+
+    if let Some(Token {
+        data: Tokens::Rarrow,
+        ..
+    }) = lexer.peek()
+    {
+        lexer.next_token().unwrap();
+        let second = parse_transform(lexer);
+        Transformation::Change(first.into(), second.into())
+    } else {
+        first
     }
 }
 
@@ -118,7 +166,9 @@ impl<T: Debug> Display for Sp<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Logos, PartialEq, PartialOrd)]
+use internment::LocalIntern;
+
+#[derive(Debug, Clone, Logos, PartialEq, PartialOrd)]
 pub enum Tokens {
     // Punctuation
     #[token("*")]
@@ -187,18 +237,18 @@ pub enum Tokens {
 
     #[token("else")]
     Else,
-    
+
     #[token("true")]
     True,
 
     #[token("false")]
     False,
 
-    #[regex(r#"[a-z]?"(?:\\.|[^\\"])*""#)]
-    StringLiteral,
+    #[regex(r#"[a-z]?"(?:\\.|[^\\"])*""#, |lex| lex.slice().to_owned())]
+    StringLiteral(String),
 
-    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)")]
-    Number,
+    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)", |lex| lex.slice().parse())]
+    Number(f64),
 
     #[regex("0b[01](_?[01]+)*")]
     BinaryLiteral,
@@ -208,24 +258,24 @@ pub enum Tokens {
 
     #[regex("0o[0-7](_?[0-7]+)*")]
     OctalLiteral,
-    
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
-    Ident,
+
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| LocalIntern::new(lex.slice().to_owned()))]
+    Ident(LocalIntern<String>),
 
     #[token("\n")]
     Newline,
 
     #[error]
     #[regex(r"[ \t\f]+", logos::skip)]
-    Error,  
+    Error,
 }
 
 #[cfg(test)]
 pub mod test {
     use super::*;
-    
+
     #[test]
     fn tokens() {
-        Lexer::new(r#"*+-/_[](){}<-->;:,.? let if then else true false "uwu" 1 1.1 0b1010 0xa 0o7 a"#, None).parse();
+        dbg!(Lexer::new(r#"[a, b, c] -> [c, b, a]"#, None,).parse());
     }
 }
