@@ -1,15 +1,17 @@
 use std::{str::FromStr, error::Error, fmt::Display, path::PathBuf};
 
 pub type Pattern<'a> = Vec<Value<'a>>;
+pub type Expression<'a> = Vec<Pattern<'a>>;
 
 struct TopLevel<'a> {
-    patts: Vec<Pattern<'a>>
+    exprs: Vec<Expression<'a>>
 }
 
+#[derive(Clone)]
 pub enum Value<'a> {
     Number(f64),
     String(String),
-    Array(&'a [Value<'a>]),
+    Array(Vec<Value<'a>>),
     Tuple(&'a [Value<'a>])
 }
 

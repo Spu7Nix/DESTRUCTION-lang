@@ -1,3 +1,5 @@
+use core::slice::SlicePattern;
+
 use parser::ast::{Value, Pattern};
 
 impl<'a> Expr for Pattern<'a> {
@@ -10,21 +12,9 @@ impl<'a> Maths for Value<'a> {
     fn add(&self, other: &Self) -> Value {
         match (self, other) {
             (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),
-            (Value::Number(_), Value::String(_)) => todo!(),
-            (Value::Number(_), Value::Array(_)) => todo!(),
-            (Value::Number(_), Value::Tuple(_)) => todo!(),
-            (Value::String(_), Value::Number(_)) => todo!(),
-            (Value::String(_), Value::String(_)) => todo!(),
-            (Value::String(_), Value::Array(_)) => todo!(),
-            (Value::String(_), Value::Tuple(_)) => todo!(),
-            (Value::Array(_), Value::Number(_)) => todo!(),
-            (Value::Array(_), Value::String(_)) => todo!(),
-            (Value::Array(_), Value::Array(_)) => todo!(),
-            (Value::Array(_), Value::Tuple(_)) => todo!(),
-            (Value::Tuple(_), Value::Number(_)) => todo!(),
-            (Value::Tuple(_), Value::String(_)) => todo!(),
-            (Value::Tuple(_), Value::Array(_)) => todo!(),
-            (Value::Tuple(_), Value::Tuple(_)) => todo!(),
+            (Value::String(lhs), Value::String(rhs)) => Value::String(lhs.to_owned() + &rhs),
+            (Value::Array(lhs), Value::Array(rhs)) => Value::Array([lhs.to_owned(), rhs.to_owned()].concat()),
+            _ => todo!()
         }
     }
 
