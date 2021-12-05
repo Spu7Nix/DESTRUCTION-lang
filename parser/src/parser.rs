@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::ast::{LangError, LangErrorT, TopLevel, Transformation};
+use crate::ast::{Expr, LangError, LangErrorT, Operator, TopLevel, Transformation};
 
 type Token = Sp<Tokens>;
 
@@ -29,15 +29,15 @@ impl<'a> Lexer<'a> {
         let token = self.tokens.next()?;
 
         if token == Tokens::Newline {
-            self.pos.0 += 1;
+            self.pos.0 += 1; // :3
+            self.next_token()
         } else {
             self.pos.1 += self.tokens.span().len();
+            Some(Token {
+                data: token,
+                span: self.tokens.span().into(),
+            })
         }
-
-        Some(Token {
-            data: token,
-            span: self.tokens.span().into(),
-        })
     }
 
     pub fn parse(&mut self) -> TopLevel {
@@ -55,19 +55,43 @@ impl<'a> Lexer<'a> {
         top_level
     }
 
-    fn parse_transform(&mut self) -> Transformation {
+    fn parse_maths(&mut self, operator: Tokens, lhs: Expr, rhs: Expr) -> Expr {
+        match operator {
+            op @ (Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash) => {
+                let lhs = box lhs.into();
+                let rhs = box rhs.into();
+                Expr::Operator(op.into(), lhs, rhs)
+            }
+
+            t => {
+                println!("{:?}", t);
+                todo!()
+            }
+        }
+    }
+
+    fn parse_expr(&mut self) -> Expr {
         let next_token = self.next_token().unwrap_or_else(|| {
             self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input")
         });
 
         let first = match next_token.data {
-            Tokens::Number(n) => Transformation::Number(n),
-            Tokens::StringLiteral(s) => Transformation::String(s),
-
+            Tokens::Number(n) => Expr::Number(n),
+            Tokens::StringLiteral(s) => Expr::String(s),
             Tokens::Lbracket => {
-                let mut transforms = Vec::new();
+                // check for immidiate right bracket
+                if let Some(Token {
+                    data: Tokens::Rbracket,
+                    span: _,
+                }) = self.peek()
+                {
+                    self.next_token();
+                    return Expr::Array(Vec::new());
+                }
+
+                let mut exprs = Vec::new();
                 loop {
-                    transforms.push(self.parse_transform());
+                    exprs.push(self.parse_expr());
                     match self
                         .next_token()
                         .unwrap_or_else(|| {
@@ -77,35 +101,59 @@ impl<'a> Lexer<'a> {
                     {
                         Tokens::Comma => (),
                         Tokens::Rbracket => break,
+
                         token => self.throw_error(
                             LangErrorT::SyntaxError,
                             &format!("Expected tokens `Rbracket` or `Comma`, found {:?}", token),
                         ),
                     }
                 }
-                Transformation::Array(transforms)
+                Expr::Array(exprs)
             }
 
-            Tokens::Ident(s) => Transformation::Ident(s),
+            Tokens::Ident(s) => Expr::Ident(s),
 
             token => self.throw_error(
                 LangErrorT::SyntaxError,
-                &format!("Unexpected token {:?}", token),
+                &format!("Unexpected token: {:?}", token),
             ),
         };
 
-        if let Some(Token {
-            data: Tokens::Rarrow,
-            ..
-        }) = self.peek()
-        {
-            self.next_token().unwrap_or_else(|| {
-                self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input");
-            });
-            let second = self.parse_transform();
-            Transformation::Change(first.into(), second.into())
-        } else {
-            first
+        match self.peek() {
+            Some(Token {
+                data: operator @ (Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash),
+                ..
+            }) => {
+                self.next_token();
+                let rhs = self.parse_expr();
+                self.parse_maths(operator, first, rhs)
+            }
+
+            _ => first,
+        }
+    }
+
+    pub fn parse_transform(&mut self) -> Transformation {
+        let destruct = self.parse_expr();
+        match self.next_token() {
+            Some(Token {
+                data: Tokens::Rarrow,
+                ..
+            }) => {
+                let construct = self.parse_expr();
+                Transformation::Forced {
+                    destruct,
+                    construct,
+                }
+            }
+            Some(a) => self.throw_error(
+                LangErrorT::SyntaxError,
+                &format!("Expected arrow, found {}", a),
+            ),
+            None => self.throw_error(
+                LangErrorT::SyntaxError,
+                "Unexpected end of input, exprected arrow",
+            ),
         }
     }
 
@@ -125,7 +173,11 @@ impl<'a> Lexer<'a> {
     pub fn peek(&self) -> Option<Token> {
         // Cloning self.tokens is more efficient than cloning self, 1 field vs 3
         let mut tokens = self.tokens.clone();
-        let token = tokens.next()?;
+        let mut token = tokens.next()?;
+
+        while token == Tokens::Newline {            
+            token = tokens.next()?;
+        }
 
         Some(Token {
             data: token,
@@ -141,6 +193,9 @@ impl<'a> Lexer<'a> {
         while let Some(token) = tokens.next() {
             if idx == amount {
                 break;
+            }
+            if token == Tokens::Newline {
+                continue;
             }
             out.push(Token {
                 data: token,
@@ -193,6 +248,30 @@ impl From<logos::Span> for Span {
 impl<T: Debug> Display for Sp<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl From<Tokens> for Expr {
+    fn from(t: Tokens) -> Self {
+        match t {
+            Tokens::StringLiteral(s) => Expr::String(s),
+            Tokens::Ident(i) => Expr::Ident(i),
+            Tokens::Number(n) => Expr::Number(n),
+
+            _ => panic!(),
+        }
+    }
+}
+
+impl From<Tokens> for Operator {
+    fn from(t: Tokens) -> Self {
+        match t {
+            Tokens::Minus => Operator::Sub, // fixed now?
+            Tokens::Plus => Operator::Add,
+            Tokens::Star => Operator::Mul, // uhhh
+            Tokens::Fslash => Operator::Div,
+            _ => panic!(),
+        }
     }
 }
 
@@ -255,6 +334,24 @@ pub enum Tokens {
     #[token("?")]
     Question,
 
+    #[token("==")]
+    Equal,
+
+    #[token("!=")]
+    NotEqual,
+
+    #[token("<")]
+    LessThan,
+
+    #[token("<=")]
+    LessThanEqual,
+
+    #[token(">")]
+    GreaterThan,
+
+    #[token(">=")]
+    GreaterThanEqual,
+
     // Keywords and literals
     #[token("let")]
     Let,
@@ -306,6 +403,14 @@ pub mod test {
 
     #[test]
     fn tokens() {
-        dbg!(Lexer::new(r#"[a, b, c] -> [c, b, a]"#, None,).parse());
+        dbg!(Lexer::new(
+            r#"
+[a, b] -> [b, a]
+[a, b] -> a + b
+    
+        "#,
+            None,
+        )
+        .parse());
     }
 }

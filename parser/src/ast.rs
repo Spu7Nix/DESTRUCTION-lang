@@ -1,15 +1,23 @@
 use internment::LocalIntern;
 use std::{error::Error, fmt::Display, path::PathBuf, str::FromStr};
 
-#[derive(Debug)]
+use crate::parser::Lexer;
+
+#[derive(Debug)] 
 pub enum Transformation {
+    Forced {
+        destruct: Expr,
+        construct: Expr,
+    }
+} 
+#[derive(Debug)] 
+pub enum Expr {
     Number(f64),
     String(String),
-    Array(Vec<Transformation>),
-    Tuple(Vec<Transformation>),
+    Array(Vec<Expr>),
+    Tuple(Vec<Expr>),
     Ident(LocalIntern<String>),
-    Operator(Box<Transformation>, Operator, Box<Transformation>),
-    Change(Box<Transformation>, Box<Transformation>), // arrow ->
+    Operator(Operator, Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug)]
@@ -50,6 +58,8 @@ impl FromStr for TopLevel {
     type Err = LangError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let mut lexer = Lexer::new(s, None);
+
+        Ok(lexer.parse())
     }
 }
