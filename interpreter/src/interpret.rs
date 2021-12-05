@@ -82,7 +82,7 @@ impl Structure for Expr {
     fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Value {
         match self {
             Expr::Number(n) => Value::Number(*n),
-            Expr::String(s) => Value::String(s.to_owned()), // btw we can make strings localintern 
+            Expr::String(s, _) => Value::String(s.to_owned()), // btw we can make strings localintern 
             Expr::Array(arr) => Value::Array(arr.iter().map(|e| e.construct(variables)).collect()),
             Expr::Tuple(t) => Value::Tuple(t.iter().map(|e| e.construct(variables)).collect()),
             Expr::Ident(i) => variables.get(i).unwrap().clone(),
@@ -105,7 +105,7 @@ impl Structure for Expr {
             } else {
                 Err(RuntimeError::PatternMismatch)
             },
-            Expr::String(s) => if let Value::String(s2) = value {
+            Expr::String(s, _) => if let Value::String(s2) = value {
                 if s == s2 {
                     Ok(())
                 } else {

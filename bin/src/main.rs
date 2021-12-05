@@ -3,7 +3,6 @@ use std::{fs::File, io::Read};
 use clap::{App, Arg, SubCommand};
 use parser::ast::TopLevel;
 
-
 fn main() {
     let matches = App::new("pootis name here")
         .author("krista-chan <qbotdev84@gmail.com>, spu7nix <main@spu7nix.net>, flow, camila314") // put emails here
@@ -15,7 +14,7 @@ fn main() {
                 Arg::with_name("path")
                 .short("p")
                 .required(true)
-                .index(1) // :flushed:
+                .index(1) 
             )
             .arg(
                 Arg::with_name("input")

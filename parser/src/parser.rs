@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::ast::{Expr, LangError, LangErrorT, Operator, TopLevel, Transformation};
+use crate::ast::{Expr, LangError, LangErrorT, Operator, TopLevel, Transformation, StringFlag};
 
 type Token = Sp<Tokens>;
 
@@ -70,6 +70,18 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn expect(&mut self, token: Tokens) -> Result<(), LangError> {
+        if let Some(Token { data: token, .. }) = self.peek() {
+            self.next_token();
+            Ok(())
+        } else {
+            self.throw_error(
+                LangErrorT::SyntaxError,
+                &format!("Expected {:?}", token),
+            )
+        }
+    }
+
     fn parse_expr(&mut self) -> Expr {
         let next_token = self.next_token().unwrap_or_else(|| {
             self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input")
@@ -77,7 +89,20 @@ impl<'a> Lexer<'a> {
 
         let first = match next_token.data {
             Tokens::Number(n) => Expr::Number(n),
-            Tokens::StringLiteral(s) => Expr::String(s),
+            Tokens::StringLiteral(mut s) => {
+                let flag = if !s.starts_with('"') { // why can't this be @ lexer // i mean you can try // discord 
+                    let flag = s.remove(0);
+                    match flag { // where are we holding the flag?
+                        'f' => Some(StringFlag::Format),
+                        f => self.throw_error(LangErrorT::SyntaxError, &format!("Invalid string flag '{}'", f))
+                    }
+                } else {
+                    None
+                };
+                s.remove(0);
+                s.pop();
+                Expr::String(s, flag)
+            },
             Tokens::Lbracket => {
                 // check for immidiate right bracket
                 if let Some(Token {
@@ -113,6 +138,12 @@ impl<'a> Lexer<'a> {
 
             Tokens::Ident(s) => Expr::Ident(s),
 
+            Tokens::Lparen => {
+                let expr = self.parse_expr();
+                self.expect(Tokens::Rparen);
+                expr
+            }
+
             token => self.throw_error(
                 LangErrorT::SyntaxError,
                 &format!("Unexpected token: {:?}", token),
@@ -124,6 +155,7 @@ impl<'a> Lexer<'a> {
                 data: operator @ (Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash),
                 ..
             }) => {
+                
                 self.next_token();
                 let rhs = self.parse_expr();
                 self.parse_maths(operator, first, rhs)
@@ -135,26 +167,13 @@ impl<'a> Lexer<'a> {
 
     pub fn parse_transform(&mut self) -> Transformation {
         let destruct = self.parse_expr();
-        match self.next_token() {
-            Some(Token {
-                data: Tokens::Rarrow,
-                ..
-            }) => {
-                let construct = self.parse_expr();
-                Transformation::Forced {
-                    destruct,
-                    construct,
-                }
-            }
-            Some(a) => self.throw_error(
-                LangErrorT::SyntaxError,
-                &format!("Expected arrow, found {}", a),
-            ),
-            None => self.throw_error(
-                LangErrorT::SyntaxError,
-                "Unexpected end of input, exprected arrow",
-            ),
+        self.expect(Tokens::Rarrow);
+        let construct = self.parse_expr();
+        Transformation::Forced {
+            destruct,
+            construct,
         }
+            
     }
 
     pub fn throw_error(&self, error: LangErrorT, message: &str) -> ! {
@@ -212,7 +231,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Sp<T> {
     data: T,
     span: Span,
@@ -227,7 +246,7 @@ impl Default for Token {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Span {
     start: usize,
     end: usize,
@@ -253,7 +272,7 @@ impl<T: Debug> Display for Sp<T> {
 
 impl From<Tokens> for Expr {
     fn from(t: Tokens) -> Self {
-        match t {
+        match t { // ill add the thingy thingy at Tokens ok your 
             Tokens::StringLiteral(s) => Expr::String(s),
             Tokens::Ident(i) => Expr::Ident(i),
             Tokens::Number(n) => Expr::Number(n),
@@ -277,7 +296,7 @@ impl From<Tokens> for Operator {
 
 use internment::LocalIntern;
 
-#[derive(Debug, Clone, Logos, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Logos, PartialEq, PartialOrd)] // push push //
 pub enum Tokens {
     // Punctuation
     #[token("*")]
@@ -371,10 +390,24 @@ pub enum Tokens {
     #[token("false")]
     False,
 
-    #[regex(r#"[a-z]?"(?:\\.|[^\\"])*""#, |lex| lex.slice().to_owned())]
-    StringLiteral(String),
+    #[regex(r#"[f]?"(?:\\.|[^\\"])*""#, |lex| {
+        let mut s = lex.slice().to_owned();
+        let flag = if !s.starts_with('"') { // well anyways theres an error up here
+            match s.remove(0) { // we dont need Option because of constraints in the token regex
+                'f' => Some(StringFlag::Format),
+                _ => unreachable!(),
+            }
+        } else {
+            None
+        };
 
-    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)", |lex| lex.slice().parse())]
+        s.remove(0);
+        s.pop();
+        (s, flag)
+    })]
+    StringLiteral((String, StringFlag)),
+
+    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)", |lex| lex.slice().parse())] // like here // where does the error go // Err token // a
     Number(f64),
 
     #[regex("0b[01](_?[01]+)*")]

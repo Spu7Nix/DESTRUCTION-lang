@@ -13,11 +13,16 @@ pub enum Transformation {
 #[derive(Debug)] 
 pub enum Expr {
     Number(f64),
-    String(String),
+    String(String, Option<StringFlag>),
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
     Ident(LocalIntern<String>),
     Operator(Operator, Box<Expr>, Box<Expr>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum StringFlag {
+    Format
 }
 
 #[derive(Debug)]
