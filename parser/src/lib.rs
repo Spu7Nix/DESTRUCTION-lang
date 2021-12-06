@@ -1,4 +1,3 @@
-#![feature(format_args_capture)]
 #![feature(box_syntax)]
 
 pub mod parser;

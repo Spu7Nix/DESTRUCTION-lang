@@ -71,7 +71,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn expect(&mut self, token: Tokens) -> Result<(), LangError> {
-        if let Some(Token { data: token, .. }) = self.peek() {
+        if let Some(Token { data: _token, .. }) = self.peek() {
             self.next_token();
             Ok(())
         } else {
@@ -132,7 +132,7 @@ impl<'a> Lexer<'a> {
 
             Tokens::Lparen => {
                 let expr = self.parse_expr();
-                self.expect(Tokens::Rparen);
+                self.expect(Tokens::Rparen).expect("no error set");
                 expr
             }
 
@@ -159,7 +159,7 @@ impl<'a> Lexer<'a> {
 
     pub fn parse_transform(&mut self) -> Transformation {
         let destruct = self.parse_expr();
-        self.expect(Tokens::Rarrow);
+        self.expect(Tokens::Rarrow).expect("no error set");
         let construct = self.parse_expr();
         Transformation::Forced {
             destruct,
@@ -392,9 +392,6 @@ pub enum Tokens {
         } else {
             None
         };
-
-        s.remove(0);
-        s.pop();
         (s, flag)
     })]
     StringLiteral((String, Option<StringFlag>)),

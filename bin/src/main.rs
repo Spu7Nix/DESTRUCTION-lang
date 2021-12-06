@@ -36,6 +36,7 @@ fn main() {
         let parsed = contents.parse::<TopLevel>().unwrap(); // fancy
         dbg!(&parsed);
         let evaled = interpreter::interpret::interpret(parsed, interpreter::traits::Value::String(m.value_of("input").unwrap().to_string()));
+        println!("Done!");
         dbg!(evaled.unwrap());
     }
 }// lol
