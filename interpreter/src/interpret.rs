@@ -71,7 +71,6 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
                 destruct, construct
             } => {
                 destruct.destruct(&value, &mut env).unwrap();
-                dbg!(&env);
                 value = construct.construct(&env);
             }
         }
