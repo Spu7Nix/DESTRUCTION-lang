@@ -1,18 +1,17 @@
 use std::collections::HashMap;
 
-use parser::{ast::Expr as Expression, internment::LocalIntern};
+use parser::internment::LocalIntern;
 
-use crate::interpret::RuntimeError;
+use crate::error::RuntimeError;
 
 #[derive(Debug, Clone, PartialEq)] // vec isnt Copy ye ik i just had oto chek chek
 pub enum Value {
-    Number(f64), 
+    Number(f64),
     String(String),
     Array(Vec<Value>),
     Tuple(Vec<Value>),
-    Ident(LocalIntern<String>)
+    Ident(LocalIntern<String>),
 }
-
 
 pub trait Maths {
     fn add(&self, other: &Self) -> Value;
@@ -23,5 +22,9 @@ pub trait Maths {
 
 pub trait Structure {
     fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Value;
-    fn destruct(&self, value: &Value, variables: &mut HashMap<LocalIntern<String>, Value>) -> Result<(), RuntimeError>;
+    fn destruct(
+        &self,
+        value: &Value,
+        variables: &mut HashMap<LocalIntern<String>, Value>,
+    ) -> Result<(), RuntimeError>;
 }

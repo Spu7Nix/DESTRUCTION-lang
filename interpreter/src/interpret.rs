@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::error::RuntimeError;
 use crate::traits::{Maths, Structure, Value};
 use parser::ast::{Expr, TopLevel};
 use parser::internment::LocalIntern;
@@ -147,17 +148,9 @@ impl Structure for Expr {
                 Ok(())
             },
             Expr::Operator(op, a, b) => {
-                use parser::ast::Operator::*;
                 todo!()
             },
         }
         
     }
-}
-
-
-#[derive(Debug)]
-pub enum RuntimeError {
-    PatternMismatch,
-    ValueError
 }

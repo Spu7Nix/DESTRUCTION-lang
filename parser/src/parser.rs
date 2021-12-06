@@ -3,8 +3,8 @@ use std::{
     fmt::{Debug, Display},
     path::PathBuf,
 };
-
-use crate::ast::{Expr, LangError, LangErrorT, Operator, TopLevel, Transformation, StringFlag};
+use crate::error::{LangError, LangErrorT};
+use crate::ast::{Expr, Operator, TopLevel, Transformation, StringFlag};
 
 type Token = Sp<Tokens>;
 
@@ -58,8 +58,8 @@ impl<'a> Lexer<'a> {
     fn parse_maths(&mut self, operator: Tokens, lhs: Expr, rhs: Expr) -> Expr {
         match operator {
             op @ (Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash) => {
-                let lhs = box lhs.into();
-                let rhs = box rhs.into();
+                let lhs = box lhs;
+                let rhs = box rhs;
                 Expr::Operator(op.into(), lhs, rhs)
             }
 
