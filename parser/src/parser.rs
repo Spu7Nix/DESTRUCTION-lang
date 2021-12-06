@@ -90,18 +90,10 @@ impl<'a> Lexer<'a> {
         let first = match next_token.data {
             Tokens::Number(n) => Expr::Number(n),
             Tokens::StringLiteral(mut s) => {
-                let flag = if !s.starts_with('"') { // why can't this be @ lexer // i mean you can try // discord 
-                    let flag = s.remove(0);
-                    match flag { // where are we holding the flag?
-                        'f' => Some(StringFlag::Format),
-                        f => self.throw_error(LangErrorT::SyntaxError, &format!("Invalid string flag '{}'", f))
-                    }
-                } else {
-                    None
-                };
-                s.remove(0);
-                s.pop();
-                Expr::String(s, flag)
+                let flag = s.1;
+                s.0.remove(0);
+                s.0.pop();
+                Expr::String(s.0, flag)
             },
             Tokens::Lbracket => {
                 // check for immidiate right bracket
@@ -273,7 +265,7 @@ impl<T: Debug> Display for Sp<T> {
 impl From<Tokens> for Expr {
     fn from(t: Tokens) -> Self {
         match t { // ill add the thingy thingy at Tokens ok your 
-            Tokens::StringLiteral(s) => Expr::String(s),
+            Tokens::StringLiteral(s) => Expr::String(s.0, s.1),
             Tokens::Ident(i) => Expr::Ident(i),
             Tokens::Number(n) => Expr::Number(n),
 
@@ -405,7 +397,7 @@ pub enum Tokens {
         s.pop();
         (s, flag)
     })]
-    StringLiteral((String, StringFlag)),
+    StringLiteral((String, Option<StringFlag>)),
 
     #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)", |lex| lex.slice().parse())] // like here // where does the error go // Err token // a
     Number(f64),

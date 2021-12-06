@@ -3,6 +3,9 @@ use std::{error::Error, fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::parser::Lexer;
 
+use logos::internal::CallbackResult;
+use logos::Logos;
+
 #[derive(Debug)] 
 pub enum Transformation {
     Forced {
