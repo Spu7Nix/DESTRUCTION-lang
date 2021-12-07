@@ -1,10 +1,10 @@
+use crate::ast::{Expr, Operator, StringFlag, TopLevel, Transformation};
+use crate::error::{LangError, LangErrorT};
 use logos::Logos;
 use std::{
     fmt::{Debug, Display},
     path::PathBuf,
 };
-use crate::error::{LangError, LangErrorT};
-use crate::ast::{Expr, Operator, TopLevel, Transformation, StringFlag};
 
 type Token = Sp<Tokens>;
 
@@ -75,10 +75,7 @@ impl<'a> Lexer<'a> {
             self.next_token();
             Ok(())
         } else {
-            self.throw_error(
-                LangErrorT::SyntaxError,
-                &format!("Expected {:?}", token),
-            )
+            self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token))
         }
     }
 
@@ -94,7 +91,7 @@ impl<'a> Lexer<'a> {
                 s.0.remove(0);
                 s.0.pop();
                 Expr::String(s.0, flag)
-            },
+            }
             Tokens::Lbracket => {
                 // check for immidiate right bracket
                 if let Some(Token {
@@ -147,7 +144,6 @@ impl<'a> Lexer<'a> {
                 data: operator @ (Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash),
                 ..
             }) => {
-                
                 self.next_token();
                 let rhs = self.parse_expr();
                 self.parse_maths(operator, first, rhs)
@@ -165,7 +161,6 @@ impl<'a> Lexer<'a> {
             destruct,
             construct,
         }
-            
     }
 
     pub fn throw_error(&self, error: LangErrorT, message: &str) -> ! {
@@ -186,7 +181,7 @@ impl<'a> Lexer<'a> {
         let mut tokens = self.tokens.clone();
         let mut token = tokens.next()?;
 
-        while token == Tokens::Newline {            
+        while token == Tokens::Newline {
             token = tokens.next()?;
         }
 
@@ -268,7 +263,8 @@ impl<T: Debug> Display for Sp<T> {
 
 impl From<Tokens> for Expr {
     fn from(t: Tokens) -> Self {
-        match t { // ill add the thingy thingy at Tokens ok your 
+        match t {
+            // ill add the thingy thingy at Tokens ok your
             Tokens::StringLiteral(s) => Expr::String(s.0, s.1),
             Tokens::Ident(i) => Expr::Ident(i),
             Tokens::Number(n) => Expr::Number(n),
@@ -406,7 +402,8 @@ pub enum Tokens {
     })]
     StringLiteral((String, Option<StringFlag>)),
 
-    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)", |lex| lex.slice().parse())] // like here // where does the error go // Err token // a
+    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)", |lex| lex.slice().parse())]
+    // like here // where does the error go // Err token // a
     Number(f64),
 
     #[regex("0b[01](_?[01]+)*")]
@@ -425,7 +422,7 @@ pub enum Tokens {
     Newline,
 
     #[error]
-    #[regex(r"[ \t\f]+", logos::skip)]
+    #[regex(r"[ \t\f\r]+", logos::skip)]
     Error,
 }
 

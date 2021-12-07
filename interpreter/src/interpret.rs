@@ -94,12 +94,23 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
 }
 
 impl Structure for Expr {
-    fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Result<Value, RuntimeError> {
+    fn construct(
+        &self,
+        variables: &HashMap<LocalIntern<String>, Value>,
+    ) -> Result<Value, RuntimeError> {
         match self {
             Expr::Number(n) => Ok(Value::Number(*n)),
             Expr::String(s, _) => Ok(Value::String(s.to_owned())), // btw we can make strings localintern
-            Expr::Array(arr) => Ok(Value::Array(arr.iter().map(|e| -> Result<_, _> {e.construct(variables)}).collect::<Result<_, _>>()?)),
-            Expr::Tuple(t) => Ok(Value::Tuple(t.iter().map(|e| -> Result<_, _> {e.construct(variables)}).collect::<Result<_, _>>()?)),
+            Expr::Array(arr) => Ok(Value::Array(
+                arr.iter()
+                    .map(|e| -> Result<_, _> { e.construct(variables) })
+                    .collect::<Result<_, _>>()?,
+            )),
+            Expr::Tuple(t) => Ok(Value::Tuple(
+                t.iter()
+                    .map(|e| -> Result<_, _> { e.construct(variables) })
+                    .collect::<Result<_, _>>()?,
+            )),
             Expr::Ident(i) => variables.get(i).cloned().ok_or(RuntimeError::ValueErrorT),
             Expr::Operator(op, a, b) => {
                 use parser::ast::Operator::*;
@@ -137,7 +148,8 @@ impl Structure for Expr {
                     Err(RuntimeError::PatternMismatchT)
                 }
             }
-            Expr::Array(arr) => { // i fugured out the destruct thing!!
+            Expr::Array(arr) => {
+                // i fugured out the destruct thing!!
                 if let Value::Array(arr2) = value {
                     if arr.len() != arr2.len() {
                         return Err(RuntimeError::PatternMismatchT);
@@ -187,15 +199,14 @@ impl Structure for Expr {
             }
             Expr::Operator(op, left, right) => {
                 use parser::ast::Operator::*;
-                let mut temp_vars = HashMap::new();
                 match (
-                    left.destruct(value, &mut temp_vars)?,
-                    right.destruct(value, &mut temp_vars)?,
+                    left.construct(&HashMap::new()),
+                    right.construct(&HashMap::new()),
                 ) {
-                    (Some(a), Some(b)) => {
+                    (Ok(a), Ok(b)) => {
                         // incase some patterns both destruct and give a value (like @ in rust)
-                        left.destruct(value, variables)?;
-                        right.destruct(value, variables)?;
+                        left.destruct(&a, variables)?;
+                        right.destruct(&b, variables)?;
 
                         let res = match op {
                             Add => a.add(&b),
@@ -210,21 +221,37 @@ impl Structure for Expr {
                         }
                     }
 
-                    (Some(left), None) => {
+                    (Ok(left), Err(_)) => {
                         match op {
-                            Add => destruct_algebra::add_left_destruct(&left, &*right, value, variables)?,
-                            Sub => destruct_algebra::sub_left_destruct(&left, &*right, value, variables)?,
-                            Mul => destruct_algebra::mul_left_destruct(&left, &*right, value, variables)?,
-                            Div => destruct_algebra::div_left_destruct(&left, &*right, value, variables)?,
+                            Add => destruct_algebra::add_left_destruct(
+                                &left, &*right, value, variables,
+                            )?,
+                            Sub => destruct_algebra::sub_left_destruct(
+                                &left, &*right, value, variables,
+                            )?,
+                            Mul => destruct_algebra::mul_left_destruct(
+                                &left, &*right, value, variables,
+                            )?,
+                            Div => destruct_algebra::div_left_destruct(
+                                &left, &*right, value, variables,
+                            )?,
                         };
                         Ok(None)
                     }
-                    (None, Some(right)) => {
+                    (Err(_), Ok(right)) => {
                         match op {
-                            Add => destruct_algebra::add_right_destruct(&right, &*left, value, variables)?,
-                            Sub => destruct_algebra::sub_right_destruct(&right, &*left, value, variables)?,
-                            Mul => destruct_algebra::mul_right_destruct(&right, &*left, value, variables)?,
-                            Div => destruct_algebra::div_right_destruct(&right, &*left, value, variables)?,
+                            Add => destruct_algebra::add_right_destruct(
+                                &right, &*left, value, variables,
+                            )?,
+                            Sub => destruct_algebra::sub_right_destruct(
+                                &right, &*left, value, variables,
+                            )?,
+                            Mul => destruct_algebra::mul_right_destruct(
+                                &right, &*left, value, variables,
+                            )?,
+                            Div => destruct_algebra::div_right_destruct(
+                                &right, &*left, value, variables,
+                            )?,
                         };
                         Ok(None)
                     }
