@@ -1,6 +1,6 @@
 use crate::{
     error::RuntimeError,
-    traits::{Value, Variables},
+    traits::{Value, Variables, Structure},
 };
 use parser::ast::Expr;
 
@@ -29,7 +29,7 @@ pub fn add_left_destruct(
         },
         _ => return Err(RuntimeError::ValueErrorT),
     };
-    right.destruct(target_val, variables)?;
+    right.destruct(&target_val, variables)?;
     Ok(())
 }
 
@@ -56,10 +56,10 @@ pub fn add_right_destruct(
             }
             Value::Array(a2[..(a2.len() - a1.len())].to_vec())
         },
-        _ => Err(RuntimeError::ValueErrorT),
+        _ => return Err(RuntimeError::ValueErrorT),
     };
 
-    left.destruct(target_val, variables)?;
+    left.destruct(&target_val, variables)?;
     Ok(())
 }
 

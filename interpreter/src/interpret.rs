@@ -74,7 +74,7 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
                 construct,
             } => {
                 destruct.destruct(&value, &mut env).unwrap();
-                value = construct.construct(&env);
+                value = construct.construct(&env)?;
             }
         }
     }
@@ -82,13 +82,13 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
 }
 
 impl Structure for Expr {
-    fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Result<Value> {
+    fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Result<Value, RuntimeError> {
         match self {
             Expr::Number(n) => Ok(Value::Number(*n)),
             Expr::String(s, _) => Ok(Value::String(s.to_owned())), // btw we can make strings localintern
-            Expr::Array(arr) => Ok(Value::Array(arr.iter().map(|e| e.construct(variables)).collect())),
-            Expr::Tuple(t) => Ok(Value::Tuple(t.iter().map(|e| e.construct(variables)).collect())),
-            Expr::Ident(i) => variables.get(i).cloned().ok_or(RuntimeError::ValueErrorT)),
+            Expr::Array(arr) => Ok(Value::Array(arr.iter().map(|e| -> Result<_, _> {e.construct(variables)}).collect::<Result<_, _>>()?)),
+            Expr::Tuple(t) => Ok(Value::Tuple(t.iter().map(|e| -> Result<_, _> {e.construct(variables)}).collect::<Result<_, _>>()?)),
+            Expr::Ident(i) => variables.get(i).cloned().ok_or(RuntimeError::ValueErrorT),
             Expr::Operator(op, a, b) => {
                 use parser::ast::Operator::*;
                 match op {

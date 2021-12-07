@@ -23,7 +23,7 @@ pub trait Maths {
 pub type Variables = HashMap<LocalIntern<String>, Value>;
 
 pub trait Structure {
-    fn construct(&self, variables: &Variables) -> Value;
+    fn construct(&self, variables: &Variables) -> Result<Value, RuntimeError>;
     fn destruct(
         &self,
         value: &Value,
