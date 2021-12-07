@@ -1,3 +1,4 @@
+use parser::ast::Type;
 use std::collections::HashMap;
 
 use crate::error::RuntimeError;
@@ -7,6 +8,17 @@ use parser::ast::{Expr, TopLevel};
 use parser::internment::LocalIntern;
 
 use crate::destruct_algebra;
+
+impl Value {
+    fn cast(&self, to: Type, from: Type) -> Result<Value, RuntimeError> {
+        match (self, to) {
+            (Value::String, Type::String) => (),
+            (Value::Number, Type::Number) => (),
+            (Value::Array, Type::Array) => (),
+            (Value::Tuple, Type::Tuple) => ()
+        }
+    }
+}
 
 impl Maths for Value {
     fn add(&self, other: &Self) -> Value {
@@ -219,6 +231,9 @@ impl Structure for Expr {
 
                     _ => Err(RuntimeError::ValueErrorT),
                 }
+            }
+            Expr::Cast(val, to, from) => {
+
             }
         }
     }

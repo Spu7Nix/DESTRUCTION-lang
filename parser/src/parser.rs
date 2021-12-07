@@ -334,11 +334,17 @@ pub enum Tokens {
     #[token("->")]
     Rarrow,
 
+    #[token("~>")]
+    WavyArrow,
+
     #[token(";")]
     Semi,
 
     #[token(":")]
     Colon,
+
+    #[token("::")]
+    DoubleColon,
 
     #[token(",")]
     Comma,

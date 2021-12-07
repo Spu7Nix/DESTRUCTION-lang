@@ -9,6 +9,15 @@ type Expression = Sp<Expr>;
 pub enum Transformation {
     Forced { destruct: Expr, construct: Expr },
 }
+
+#[derive(Debug)]
+pub enum Type {
+    String,
+    Number,
+    Tuple,
+    Array
+}
+
 #[derive(Debug)]
 pub enum Expr {
     Number(f64),
@@ -17,6 +26,8 @@ pub enum Expr {
     Tuple(Vec<Expr>),
     Ident(LocalIntern<String>),
     Operator(Operator, Box<Expr>, Box<Expr>),
+    Cast(Box<Expr>, Type, Type)
+
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
