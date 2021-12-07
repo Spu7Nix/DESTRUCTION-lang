@@ -1,7 +1,9 @@
 use internment::LocalIntern;
 use std::str::FromStr;
 
-use crate::{error::LangError, parser::Lexer};
+use crate::{error::LangError, parser::{Lexer, Sp}};
+
+type Expression = Sp<Expr>;
 
 #[derive(Debug)]
 pub enum Transformation {

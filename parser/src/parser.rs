@@ -218,8 +218,12 @@ impl<'a> Lexer<'a> {
         out
     }
 
-    pub(crate) fn pos(&self) -> (usize, usize) {
+    pub fn pos(&self) -> (usize, usize) {
         self.pos
+    }
+
+    pub fn file(&self) -> Option<PathBuf> {
+        self.file.to_owned()
     }
 }
 

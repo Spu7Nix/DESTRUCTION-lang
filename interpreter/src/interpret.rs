@@ -82,20 +82,20 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
 }
 
 impl Structure for Expr {
-    fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Value {
+    fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Result<Value> {
         match self {
-            Expr::Number(n) => Value::Number(*n),
-            Expr::String(s, _) => Value::String(s.to_owned()), // btw we can make strings localintern
-            Expr::Array(arr) => Value::Array(arr.iter().map(|e| e.construct(variables)).collect()),
-            Expr::Tuple(t) => Value::Tuple(t.iter().map(|e| e.construct(variables)).collect()),
-            Expr::Ident(i) => variables.get(i).unwrap().clone(),
+            Expr::Number(n) => Ok(Value::Number(*n)),
+            Expr::String(s, _) => Ok(Value::String(s.to_owned())), // btw we can make strings localintern
+            Expr::Array(arr) => Ok(Value::Array(arr.iter().map(|e| e.construct(variables)).collect())),
+            Expr::Tuple(t) => Ok(Value::Tuple(t.iter().map(|e| e.construct(variables)).collect())),
+            Expr::Ident(i) => variables.get(i).cloned().ok_or(RuntimeError::ValueErrorT)),
             Expr::Operator(op, a, b) => {
                 use parser::ast::Operator::*;
                 match op {
-                    Add => a.construct(variables).add(&b.construct(variables)),
-                    Sub => a.construct(variables).sub(&b.construct(variables)),
-                    Mul => a.construct(variables).mul(&b.construct(variables)),
-                    Div => a.construct(variables).div(&b.construct(variables)),
+                    Add => Ok(a.construct(variables)?.add(&b.construct(variables)?)),
+                    Sub => Ok(a.construct(variables)?.sub(&b.construct(variables)?)),
+                    Mul => Ok(a.construct(variables)?.mul(&b.construct(variables)?)),
+                    Div => Ok(a.construct(variables)?.div(&b.construct(variables)?)),
                 }
             }
         }
@@ -111,7 +111,7 @@ impl Structure for Expr {
                 if value == &Value::Number(*n) {
                     Ok(Some(Value::Number(*n)))
                 } else {
-                    Err(RuntimeError::PatternMismatch)
+                    Err(RuntimeError::PatternMismatchT)
                 }
             }
             Expr::String(s, _) => {
@@ -119,16 +119,16 @@ impl Structure for Expr {
                     if s == s2 {
                         Ok(Some(Value::String(s.to_owned())))
                     } else {
-                        Err(RuntimeError::PatternMismatch)
+                        Err(RuntimeError::PatternMismatchT)
                     }
                 } else {
-                    Err(RuntimeError::PatternMismatch)
+                    Err(RuntimeError::PatternMismatchT)
                 }
             }
-            Expr::Array(arr) => {
+            Expr::Array(arr) => { // i fugured out the destruct thing!!
                 if let Value::Array(arr2) = value {
                     if arr.len() != arr2.len() {
-                        return Err(RuntimeError::PatternMismatch);
+                        return Err(RuntimeError::PatternMismatchT);
                     }
                     let mut arr_val = Some(Vec::new());
 
@@ -144,13 +144,13 @@ impl Structure for Expr {
 
                     Ok(arr_val.map(Value::Array))
                 } else {
-                    Err(RuntimeError::PatternMismatch)
+                    Err(RuntimeError::PatternMismatchT)
                 }
             }
             Expr::Tuple(t) => {
                 if let Value::Array(t2) = value {
                     if t.len() != t2.len() {
-                        return Err(RuntimeError::PatternMismatch);
+                        return Err(RuntimeError::PatternMismatchT);
                     }
                     let mut arr_val = Some(Vec::new());
 
@@ -166,7 +166,7 @@ impl Structure for Expr {
 
                     Ok(arr_val.map(Value::Tuple))
                 } else {
-                    Err(RuntimeError::PatternMismatch)
+                    Err(RuntimeError::PatternMismatchT)
                 }
             }
             Expr::Ident(i) => {
@@ -194,30 +194,30 @@ impl Structure for Expr {
                         if &res == value {
                             Ok(Some(res))
                         } else {
-                            Err(RuntimeError::PatternMismatch)
+                            Err(RuntimeError::PatternMismatchT)
                         }
                     }
 
                     (Some(left), None) => {
                         match op {
-                            Add => destruct_algebra::add_left_destruct(&left, &*right, variables)?,
-                            Sub => destruct_algebra::sub_left_destruct(&left, &*right, variables)?,
-                            Mul => destruct_algebra::mul_left_destruct(&left, &*right, variables)?,
-                            Div => destruct_algebra::div_left_destruct(&left, &*right, variables)?,
+                            Add => destruct_algebra::add_left_destruct(&left, &*right, value, variables)?,
+                            Sub => destruct_algebra::sub_left_destruct(&left, &*right, value, variables)?,
+                            Mul => destruct_algebra::mul_left_destruct(&left, &*right, value, variables)?,
+                            Div => destruct_algebra::div_left_destruct(&left, &*right, value, variables)?,
                         };
                         Ok(None)
                     }
                     (None, Some(right)) => {
                         match op {
-                            Add => destruct_algebra::add_right_destruct(&right, &*left, variables)?,
-                            Sub => destruct_algebra::sub_right_destruct(&right, &*left, variables)?,
-                            Mul => destruct_algebra::mul_right_destruct(&right, &*left, variables)?,
-                            Div => destruct_algebra::div_right_destruct(&right, &*left, variables)?,
+                            Add => destruct_algebra::add_right_destruct(&right, &*left, value, variables)?,
+                            Sub => destruct_algebra::sub_right_destruct(&right, &*left, value, variables)?,
+                            Mul => destruct_algebra::mul_right_destruct(&right, &*left, value, variables)?,
+                            Div => destruct_algebra::div_right_destruct(&right, &*left, value, variables)?,
                         };
                         Ok(None)
                     }
 
-                    _ => Err(RuntimeError::ValueError),
+                    _ => Err(RuntimeError::ValueErrorT),
                 }
             }
         }
