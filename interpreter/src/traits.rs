@@ -20,11 +20,13 @@ pub trait Maths {
     fn mul(&self, other: &Self) -> Value;
 }
 
+pub type Variables = HashMap<LocalIntern<String>, Value>;
+
 pub trait Structure {
-    fn construct(&self, variables: &HashMap<LocalIntern<String>, Value>) -> Value;
+    fn construct(&self, variables: &Variables) -> Value;
     fn destruct(
         &self,
         value: &Value,
-        variables: &mut HashMap<LocalIntern<String>, Value>,
-    ) -> Result<(), RuntimeError>;
+        variables: &mut Variables,
+    ) -> Result<Option<Value>, RuntimeError>;
 }

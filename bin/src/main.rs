@@ -69,7 +69,7 @@ fn main() {
         println!("Done!");
         println!("{:?}", evaled);
     } else if let Some(m) = matches.subcommand_matches("eval") {
-        let parsed = unsafe { m.value_of("code").unwrap_unchecked().parse().unwrap() };
+        let parsed = m.value_of("code").unwrap().parse().unwrap();
 
         let evaled = interpreter::interpret::interpret(
             parsed,
