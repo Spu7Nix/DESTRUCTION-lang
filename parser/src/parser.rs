@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Operator, StringFlag, TopLevel, Transformation};
+use crate::ast::{Expr, Operator, StringFlag, TopLevel, Transformation, Type};
 use crate::error::{LangError, LangErrorT};
 use logos::Logos;
 use std::{
@@ -40,6 +40,12 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    pub fn ensure_next(&mut self) -> Token {
+        self.next_token().unwrap_or_else(|| {
+            self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input")
+        })
+    }
+
     pub fn parse(&mut self) -> TopLevel {
         let mut top_level = TopLevel {
             transformations: Vec::new(),
@@ -70,19 +76,16 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn expect(&mut self, token: Tokens) -> Result<(), LangError> {
+    fn expect(&mut self, token: Tokens) -> () {
         if let Some(Token { data: _token, .. }) = self.peek() {
             self.next_token();
-            Ok(())
         } else {
             self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token))
         }
     }
 
     fn parse_expr(&mut self) -> Expr {
-        let next_token = self.next_token().unwrap_or_else(|| {
-            self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input")
-        });
+        let next_token = self.ensure_next();
 
         let first = match next_token.data {
             Tokens::Number(n) => Expr::Number(n),
@@ -106,13 +109,7 @@ impl<'a> Lexer<'a> {
                 let mut exprs = Vec::new();
                 loop {
                     exprs.push(self.parse_expr());
-                    match self
-                        .next_token()
-                        .unwrap_or_else(|| {
-                            self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input");
-                        })
-                        .data
-                    {
+                    match self.ensure_next().data {
                         Tokens::Comma => (),
                         Tokens::Rbracket => break,
 
@@ -129,7 +126,7 @@ impl<'a> Lexer<'a> {
 
             Tokens::Lparen => {
                 let expr = self.parse_expr();
-                self.expect(Tokens::Rparen).expect("no error set");
+                self.expect(Tokens::Rparen);
                 expr
             }
 
@@ -147,15 +144,57 @@ impl<'a> Lexer<'a> {
                 self.next_token();
                 let rhs = self.parse_expr();
                 self.parse_maths(operator, first, rhs)
-            }
+            },
 
+            Some(Token {
+                data: Tokens::DoubleColon,
+                ..
+            }) => {
+                // cast
+                // v::#from ~> #to
+                self.next_token();
+                let from = match self.ensure_next().data {
+                    Tokens::Type(s) => {
+                        let mut s2 = s.to_string();
+                        s2.remove(0);
+                        s2.parse::<Type>().unwrap_or_else(|_| self.throw_error(
+                            LangErrorT::SyntaxError,
+                            &format!("{:?} is not a valid type", s),
+                        ))
+                    },
+                    token => self.throw_error(
+                        LangErrorT::SyntaxError,
+                        &format!("Expected type, found {:?}", token),
+                    )
+                };
+
+                self.expect(Tokens::WavyArrow);
+
+                let to = match self.ensure_next().data {
+                    Tokens::Type(s) => {
+                        let mut s2 = s.to_string();
+                        s2.remove(0);
+                        s2.parse::<Type>().unwrap_or_else(|_| self.throw_error(
+                            LangErrorT::SyntaxError,
+                            &format!("{:?} is not a valid type", s2),
+                        ))
+                    },
+                    token => self.throw_error(
+                        LangErrorT::SyntaxError,
+                        &format!("Expected type, found {:?}", token),
+                    )
+                };
+
+
+                Expr::Cast(box first, to, from)
+            }
             _ => first,
         }
     }
 
     pub fn parse_transform(&mut self) -> Transformation {
         let destruct = self.parse_expr();
-        self.expect(Tokens::Rarrow).expect("no error set");
+        self.expect(Tokens::Rarrow);
         let construct = self.parse_expr();
         Transformation::Forced {
             destruct,
@@ -417,6 +456,9 @@ pub enum Tokens {
 
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| LocalIntern::new(lex.slice().to_owned()))]
     Ident(LocalIntern<String>),
+
+    #[regex(r"#[a-zA-Z_][a-zA-Z0-9_]*", |lex| LocalIntern::new(lex.slice().to_owned()))]
+    Type(LocalIntern<String>),
 
     #[token("\n")]
     Newline,

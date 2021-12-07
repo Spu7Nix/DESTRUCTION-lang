@@ -1,1 +1,1 @@
-(a::int ~> str) -> a + 3
+(a::#number ~> #string) -> a + 3

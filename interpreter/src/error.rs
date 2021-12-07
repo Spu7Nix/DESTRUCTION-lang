@@ -15,6 +15,13 @@ pub enum RuntimeError {
         pos: (usize, usize),
         message: String,
         file: Option<PathBuf>,
+    },
+    TypeMismatchT(String, String),
+    TypeMismatch {
+        pos: (usize, usize),
+        expected: String,
+        found: String,
+        file: Option<PathBuf>
     }
 }
 
@@ -23,8 +30,10 @@ impl RuntimeError {
         match t {
             RuntimeError::PatternMismatchT => Self::PatternMismatch { file: lexer.file(), pos: lexer.pos(), message: message.to_string() },
             RuntimeError::ValueErrorT => Self::ValueError { file: lexer.file(), pos: lexer.pos(), message: message.to_string() },
+            RuntimeError::TypeMismatchT(e, f) => Self::TypeMismatch { file: lexer.file(), pos: lexer.pos(), expected: e, found: f },
             err @ RuntimeError::PatternMismatch { .. } => err,
-            err @ RuntimeError::ValueError { .. } => err
+            err @ RuntimeError::ValueError { .. } => err,
+            err @ RuntimeError::TypeMismatch { .. } => err
         }
     }
 }

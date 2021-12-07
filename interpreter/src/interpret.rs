@@ -1,5 +1,6 @@
 use parser::ast::Type;
 use std::collections::HashMap;
+use std::fmt;
 
 use crate::error::RuntimeError;
 use crate::traits::{Maths, Structure, Value, Variables};
@@ -10,12 +11,32 @@ use parser::internment::LocalIntern;
 use crate::destruct_algebra;
 
 impl Value {
-    fn cast(&self, to: Type, from: Type) -> Result<Value, RuntimeError> {
-        match (self, to) {
-            (Value::String, Type::String) => (),
-            (Value::Number, Type::Number) => (),
-            (Value::Array, Type::Array) => (),
-            (Value::Tuple, Type::Tuple) => ()
+    fn to_type(&self) -> &Type {
+        match self {
+            Value::String(_) => &Type::String,
+            Value::Number(_) => &Type::Number,
+            Value::Tuple(_) => &Type::Tuple,
+            Value::Array(_) => &Type::Array,
+            Value::Ident(_) => unreachable!()
+        }
+    }
+    fn cast(&self, to: &Type, from: &Type) -> Result<Value, RuntimeError> {
+
+        if from != self.to_type() {
+            return Err(RuntimeError::TypeMismatchT(from.to_string(), self.to_type().to_string()));
+        }
+        if to == self.to_type() {
+            return Ok(self.clone());
+        }
+        match (to, self) {
+            (Type::Number, Value::String(s)) => Ok(Self::Number(s.parse::<f64>().ok().unwrap_or(f64::NAN))),
+            (Type::Number, Value::Array(_) | Value::Tuple(_)) => Err(RuntimeError::ValueErrorT),
+            (Type::Array | Type::Tuple, Value::Number(_)) => Err(RuntimeError::ValueErrorT),
+            (Type::String, v) => Ok(Self::String(format!("{:?}", v))), //TODO: something better than just debug
+            (Type::Array, Value::String(s)) => Ok(Self::Array(s.chars().map(|x| Value::String(String::from(x))).collect())),
+            (Type::Tuple, Value::String(s)) => Ok(Self::Tuple(s.chars().map(|x| Value::String(String::from(x))).collect())),
+
+            _ => unreachable!()
         }
     }
 }
@@ -120,6 +141,9 @@ impl Structure for Expr {
                     Mul => Ok(a.construct(variables)?.mul(&b.construct(variables)?)),
                     Div => Ok(a.construct(variables)?.div(&b.construct(variables)?)),
                 }
+            }
+            Expr::Cast(exp, to, from) => {
+                exp.construct(variables)?.cast(to, from)
             }
         }
     }
@@ -259,8 +283,10 @@ impl Structure for Expr {
                     _ => Err(RuntimeError::ValueErrorT),
                 }
             }
-            Expr::Cast(val, to, from) => {
-
+            Expr::Cast(exp, to, from) => {
+                exp.destruct(&value.cast(from, to)?, variables)
+                //todo!();
+                //TODO: destructure casting (idk how to do)
             }
         }
     }
