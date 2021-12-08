@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use parser::internment::LocalIntern;
+use parser::{ast::Transformation, internment::LocalIntern};
 
 use crate::error::RuntimeError;
 
@@ -25,12 +25,19 @@ pub struct Variables {
     pub polyidents: HashMap<LocalIntern<String>, Vec<Value>>,
 }
 
+pub type Functions = HashMap<LocalIntern<String>, Vec<Transformation>>;
+
 pub trait Structure {
-    fn construct(&self, variables: &mut Variables) -> Result<Value, RuntimeError>;
+    fn construct(
+        &self,
+        variables: &mut Variables,
+        functions: &Functions,
+    ) -> Result<Value, RuntimeError>;
     fn destruct(
         &self,
         value: &Value,
         variables: &mut Variables,
+        functions: &Functions,
     ) -> Result<Option<Value>, RuntimeError>;
 }
 

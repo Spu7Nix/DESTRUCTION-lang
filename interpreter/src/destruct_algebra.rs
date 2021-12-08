@@ -1,6 +1,6 @@
 use crate::{
     error::RuntimeError,
-    traits::{Structure, Value, Variables},
+    traits::{Functions, Structure, Value, Variables},
 };
 use parser::ast::Expr;
 
@@ -9,6 +9,7 @@ pub fn add_left_destruct(
     right: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     // (a * 4 - 6) + 10 -> a // input 15 output 5
     let target_val = match (left, target_val) {
@@ -41,7 +42,7 @@ pub fn add_left_destruct(
             )))
         }
     };
-    right.destruct(&target_val, variables)?;
+    right.destruct(&target_val, variables, functions)?;
     Ok(())
 }
 
@@ -50,6 +51,7 @@ pub fn add_right_destruct(
     left: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     let target_val = match (right, target_val) {
         // x + n1 = n2
@@ -82,7 +84,7 @@ pub fn add_right_destruct(
         }
     };
 
-    left.destruct(&target_val, variables)?;
+    left.destruct(&target_val, variables, functions)?;
     Ok(())
 }
 
@@ -91,6 +93,7 @@ pub fn sub_left_destruct(
     right: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     let target_val = match (left, target_val) {
         // n1 - x = n2
@@ -103,7 +106,7 @@ pub fn sub_left_destruct(
             )))
         }
     };
-    right.destruct(&target_val, variables)?;
+    right.destruct(&target_val, variables, functions)?;
     Ok(())
 }
 
@@ -112,6 +115,7 @@ pub fn sub_right_destruct(
     left: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     let target_val = match (right, target_val) {
         // x - n1 = n2
@@ -125,7 +129,7 @@ pub fn sub_right_destruct(
         }
     };
 
-    left.destruct(&target_val, variables)?;
+    left.destruct(&target_val, variables, functions)?;
     Ok(())
 }
 
@@ -134,6 +138,7 @@ pub fn mul_left_destruct(
     right: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     let target_val = match (left, target_val) {
         // n1 * x = n2
@@ -175,7 +180,7 @@ pub fn mul_left_destruct(
             )))
         }
     };
-    right.destruct(&target_val, variables)?;
+    right.destruct(&target_val, variables, functions)?;
     Ok(())
 }
 
@@ -184,12 +189,13 @@ pub fn mul_right_destruct(
     left: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     match (right, target_val) {
         // x * n1 = n2
         (Value::Number(n1), Value::Number(n2)) => {
             let target_val = Value::Number(n2 / n1);
-            left.destruct(&target_val, variables)?;
+            left.destruct(&target_val, variables, functions)?;
             Ok(())
         }
         (Value::Number(n1), Value::Array(a2)) => {
@@ -217,7 +223,7 @@ pub fn mul_right_destruct(
 
             for i in 0..n {
                 let target = &Value::Array(a2[i * len..(i + 1) * len].to_vec());
-                left.destruct(target, variables)?;
+                left.destruct(target, variables, functions)?;
             }
 
             Ok(())
@@ -248,7 +254,7 @@ pub fn mul_right_destruct(
 
             for i in 0..n {
                 let target = &Value::String(s2[i * len..(i + 1) * len].to_string());
-                left.destruct(target, variables)?;
+                left.destruct(target, variables, functions)?;
             }
 
             Ok(())
@@ -268,6 +274,7 @@ pub fn div_left_destruct(
     right: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     let target_val = match (left, target_val) {
         // n1 / x = n2
@@ -280,7 +287,7 @@ pub fn div_left_destruct(
             )))
         }
     };
-    right.destruct(&target_val, variables)?;
+    right.destruct(&target_val, variables, functions)?;
     Ok(())
 }
 
@@ -289,6 +296,7 @@ pub fn div_right_destruct(
     left: &Expr,
     target_val: &Value,
     variables: &mut Variables,
+    functions: &Functions,
 ) -> Result<(), RuntimeError> {
     let target_val = match (right, target_val) {
         // x / n1 = n2
@@ -302,6 +310,6 @@ pub fn div_right_destruct(
         }
     };
 
-    left.destruct(&target_val, variables)?;
+    left.destruct(&target_val, variables, functions)?;
     Ok(())
 }

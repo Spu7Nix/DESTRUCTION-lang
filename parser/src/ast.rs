@@ -62,6 +62,7 @@ pub enum Expr {
     UnaryOp(UnaryOperator, Box<Expr>),
     Cast(Box<Expr>, Type, Type),
     Bool(bool),
+    Call(LocalIntern<String>, Box<Expr>),
     Any, // _
 }
 

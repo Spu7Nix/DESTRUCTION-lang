@@ -9,6 +9,12 @@ use std::{
 
 type Token = Sp<Tokens>;
 
+macro_rules! operator_pattern {
+    () => {
+        Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash
+    };
+}
+
 #[derive(Clone)]
 pub struct Lexer<'a> {
     pos: (usize, usize),
@@ -167,7 +173,22 @@ impl<'a> Lexer<'a> {
                 Expr::Array(exprs)
             }
 
-            Tokens::Ident(s) => Expr::Ident(s),
+            Tokens::Ident(s) => match self.peek() {
+                Some(Token {
+                    data:
+                        operator_pattern!()
+                        | Tokens::Rparen
+                        | Tokens::Rbracket
+                        | Tokens::Comma
+                        | Tokens::Semi
+                        | Tokens::Pipe
+                        | Tokens::Rbrace
+                        | Tokens::Rarrow
+                        | Tokens::DoubleColon,
+                    ..
+                }) => Expr::Ident(s),
+                _ => Expr::Call(s, self.parse_expr().into()),
+            },
             Tokens::Star => {
                 let ident = if let Tokens::Ident(i) = self.ensure_next().data {
                     i
@@ -220,7 +241,7 @@ impl<'a> Lexer<'a> {
 
         match self.peek() {
             Some(Token {
-                data: operator @ (Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash),
+                data: operator @ operator_pattern!(),
                 ..
             }) => {
                 self.next_token();

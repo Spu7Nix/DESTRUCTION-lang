@@ -2,7 +2,7 @@ use parser::ast::{Type, UnaryOperator};
 use parser::internment::LocalIntern;
 
 use crate::error::RuntimeError;
-use crate::traits::{Maths, Structure, Value, Variables};
+use crate::traits::{Functions, Maths, Structure, Value, Variables};
 use parser::ast::Transformation::Forced;
 use parser::ast::{Expr, TopLevel};
 
@@ -78,15 +78,22 @@ impl Maths for Value {
     }
 }
 
-fn mul(left: &Expr, right: &Value, variables: &mut Variables) -> Result<Value, RuntimeError> {
+fn mul(
+    left: &Expr,
+    right: &Value,
+    variables: &mut Variables,
+    functions: &Functions,
+) -> Result<Value, RuntimeError> {
     let factor = *match right {
         Value::Number(n) => n,
-        _ => Err(RuntimeError::TypeMismatch(
-            "number".to_string(),
-            right.to_type().to_string(),
-        ))?,
+        _ => {
+            return Err(RuntimeError::TypeMismatch(
+                "number".to_string(),
+                right.to_type().to_string(),
+            ))
+        }
     };
-    let mut out = left.construct(variables)?;
+    let mut out = left.construct(variables, functions)?;
     if let Value::Number(n) = out {
         return Ok(Value::Number(n * factor));
     }
@@ -97,31 +104,36 @@ fn mul(left: &Expr, right: &Value, variables: &mut Variables) -> Result<Value, R
     }
     let n = factor as usize;
     for _ in 0..(n - 1) {
-        out = out.add(&left.construct(variables)?);
+        out = out.add(&left.construct(variables, functions)?);
     }
     Ok(out)
 }
 
 pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeError> {
-    let mut value = input;
-    let func = top_level
-        .functions
-        .get(&LocalIntern::new("main".to_string()))
-        .ok_or_else(|| RuntimeError::ValueError("Missing `main` function".to_string()))?;
-    run_func(func, &mut value)?;
-    Ok(value)
+    run_func(
+        LocalIntern::new("main".to_string()),
+        input,
+        &top_level.functions,
+    )
 }
 
-fn run_func(func: &[parser::ast::Transformation], value: &mut Value) -> Result<(), RuntimeError> {
-    for trans in func {
+fn run_func(
+    func: LocalIntern<String>,
+    mut value: Value,
+    functions: &Functions,
+) -> Result<Value, RuntimeError> {
+    for trans in functions
+        .get(&func)
+        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?
+    {
         let mut env = Variables::new();
         match trans {
             Forced {
                 destruct,
                 construct,
             } => {
-                destruct.destruct(&*value, &mut env)?;
-                *value = construct.construct(&mut env)?;
+                destruct.destruct(&value, &mut env, functions)?;
+                value = construct.construct(&mut env, functions)?;
 
                 for (name, value) in env.polyidents.iter() {
                     if !value.is_empty() {
@@ -134,22 +146,60 @@ fn run_func(func: &[parser::ast::Transformation], value: &mut Value) -> Result<(
             }
         }
     }
-    Ok(())
+    Ok(value)
+}
+
+fn reverse_run_func(
+    func: LocalIntern<String>,
+    mut output: Value,
+    functions: &Functions,
+) -> Result<Value, RuntimeError> {
+    for trans in functions
+        .get(&func)
+        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?
+        .iter()
+        .rev()
+    {
+        let mut env = Variables::new();
+        match trans {
+            Forced {
+                destruct,
+                construct,
+            } => {
+                construct.destruct(&output, &mut env, functions)?;
+                output = destruct.construct(&mut env, functions)?;
+
+                for (name, value) in env.polyidents.iter() {
+                    if !value.is_empty() {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Polyident {} was used more times in the construct pattern than in the destruct pattern",
+                            name
+                        )));
+                    }
+                }
+            }
+        }
+    }
+    Ok(output)
 }
 
 impl Structure for Expr {
-    fn construct(&self, variables: &mut Variables) -> Result<Value, RuntimeError> {
+    fn construct(
+        &self,
+        variables: &mut Variables,
+        functions: &Functions,
+    ) -> Result<Value, RuntimeError> {
         match self {
             Expr::Number(n) => Ok(Value::Number(*n)),
             Expr::String(s, _) => Ok(Value::String(s.to_owned())), // btw we can make strings localintern
             Expr::Array(arr) => Ok(Value::Array(
                 arr.iter()
-                    .map(|e| -> Result<_, _> { e.construct(variables) })
+                    .map(|e| -> Result<_, _> { e.construct(variables, functions) })
                     .collect::<Result<_, _>>()?,
             )),
             Expr::Tuple(t) => Ok(Value::Tuple(
                 t.iter()
-                    .map(|e| -> Result<_, _> { e.construct(variables) })
+                    .map(|e| -> Result<_, _> { e.construct(variables, functions) })
                     .collect::<Result<_, _>>()?,
             )),
             Expr::Ident(i) => variables
@@ -163,16 +213,27 @@ impl Structure for Expr {
             Expr::Operator(op, a, b) => {
                 use parser::ast::Operator::*;
                 match op {
-                    Add => Ok(a.construct(variables)?.add(&b.construct(variables)?)),
-                    Sub => Ok(a.construct(variables)?.sub(&b.construct(variables)?)),
-                    Mul => Ok(mul(a, &b.construct(variables)?, variables)?),
-                    Div => Ok(a.construct(variables)?.div(&b.construct(variables)?)),
+                    Add => Ok(a
+                        .construct(variables, functions)?
+                        .add(&b.construct(variables, functions)?)),
+                    Sub => Ok(a
+                        .construct(variables, functions)?
+                        .sub(&b.construct(variables, functions)?)),
+                    Mul => Ok(mul(
+                        a,
+                        &b.construct(variables, functions)?,
+                        variables,
+                        functions,
+                    )?),
+                    Div => Ok(a
+                        .construct(variables, functions)?
+                        .div(&b.construct(variables, functions)?)),
                 }
             }
-            Expr::Cast(exp, to, from) => exp.construct(variables)?.cast(to, from),
+            Expr::Cast(exp, to, from) => exp.construct(variables, functions)?.cast(to, from),
             Expr::Bool(b) => Ok(Value::Bool(*b)),
             Expr::UnaryOp(op, val) => {
-                let val = val.construct(variables)?;
+                let val = val.construct(variables, functions)?;
                 match (op, val) {
                     (UnaryOperator::Neg, Value::Number(n)) => Ok(Value::Number(-n)),
                     (UnaryOperator::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
@@ -183,6 +244,7 @@ impl Structure for Expr {
                 }
             }
             Expr::Any => Err(RuntimeError::ValueError("Cannot construct `_`".to_string())),
+            Expr::Call(f, a) => run_func(*f, a.construct(variables, functions)?, functions),
         }
     }
 
@@ -190,6 +252,7 @@ impl Structure for Expr {
         &self,
         value: &Value,
         variables: &mut Variables,
+        functions: &Functions,
     ) -> Result<Option<Value>, RuntimeError> {
         match &self {
             Expr::Number(n) => {
@@ -242,7 +305,7 @@ impl Structure for Expr {
 
                     for (e, v) in arr.iter().zip(arr2.iter()) {
                         if let (Some(val), Some(arr_val)) =
-                            (e.destruct(v, variables)?, &mut arr_val)
+                            (e.destruct(v, variables, functions)?, &mut arr_val)
                         {
                             arr_val.push(val);
                         } else {
@@ -267,7 +330,7 @@ impl Structure for Expr {
 
                     for (e, v) in t.iter().zip(t2.iter()) {
                         if let (Some(val), Some(arr_val)) =
-                            (e.destruct(v, variables)?, &mut arr_val)
+                            (e.destruct(v, variables, functions)?, &mut arr_val)
                         {
                             arr_val.push(val);
                         } else {
@@ -292,18 +355,18 @@ impl Structure for Expr {
             Expr::Operator(op, left, right) => {
                 use parser::ast::Operator::*;
                 match (
-                    left.construct(&mut Variables::new()),
-                    right.construct(&mut Variables::new()),
+                    left.construct(&mut Variables::new(), functions),
+                    right.construct(&mut Variables::new(), functions),
                 ) {
                     (Ok(a), Ok(b)) => {
                         // incase some patterns both destruct and give a value (like @ in rust)
-                        left.destruct(&a, variables)?;
-                        right.destruct(&b, variables)?;
+                        left.destruct(&a, variables, functions)?;
+                        right.destruct(&b, variables, functions)?;
 
                         let res = match op {
                             Add => a.add(&b),
                             Sub => a.sub(&b),
-                            Mul => mul(left, &b, variables)?,
+                            Mul => mul(left, &b, variables, functions)?,
                             Div => a.div(&b),
                         };
                         if &res == value {
@@ -319,16 +382,16 @@ impl Structure for Expr {
                     (Ok(left), Err(_)) => {
                         match op {
                             Add => destruct_algebra::add_left_destruct(
-                                &left, &*right, value, variables,
+                                &left, &*right, value, variables, functions,
                             )?,
                             Sub => destruct_algebra::sub_left_destruct(
-                                &left, &*right, value, variables,
+                                &left, &*right, value, variables, functions,
                             )?,
                             Mul => destruct_algebra::mul_left_destruct(
-                                &left, &*right, value, variables,
+                                &left, &*right, value, variables, functions,
                             )?,
                             Div => destruct_algebra::div_left_destruct(
-                                &left, &*right, value, variables,
+                                &left, &*right, value, variables, functions,
                             )?,
                         };
                         Ok(None)
@@ -336,16 +399,16 @@ impl Structure for Expr {
                     (Err(_), Ok(right)) => {
                         match op {
                             Add => destruct_algebra::add_right_destruct(
-                                &right, &*left, value, variables,
+                                &right, &*left, value, variables, functions,
                             )?,
                             Sub => destruct_algebra::sub_right_destruct(
-                                &right, &*left, value, variables,
+                                &right, &*left, value, variables, functions,
                             )?,
                             Mul => destruct_algebra::mul_right_destruct(
-                                &right, &*left, value, variables,
+                                &right, &*left, value, variables, functions,
                             )?,
                             Div => destruct_algebra::div_right_destruct(
-                                &right, &*left, value, variables,
+                                &right, &*left, value, variables, functions,
                             )?,
                         };
                         Ok(None)
@@ -356,7 +419,7 @@ impl Structure for Expr {
                     )),
                 }
             }
-            Expr::Cast(exp, to, from) => exp.destruct(&value.cast(from, to)?, variables),
+            Expr::Cast(exp, to, from) => exp.destruct(&value.cast(from, to)?, variables, functions),
             Expr::UnaryOp(op, val) => {
                 let target_value = match (op, value) {
                     // -x = n
@@ -370,9 +433,13 @@ impl Structure for Expr {
                         )))
                     }
                 };
-                val.destruct(&target_value, variables)
+                val.destruct(&target_value, variables, functions)
             }
             Expr::Any => Ok(None),
+            Expr::Call(f, a) => {
+                let target_val = reverse_run_func(*f, value.clone(), functions)?;
+                a.destruct(&target_val, variables, functions)
+            }
         }
     }
 }
