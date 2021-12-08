@@ -1,11 +1,9 @@
 use parser::ast::{Type, UnaryOperator};
-use std::collections::HashMap;
 
 use crate::error::RuntimeError;
-use crate::traits::{Maths, Structure, Value};
+use crate::traits::{Maths, Structure, Value, Variables};
 use parser::ast::Transformation::Forced;
 use parser::ast::{Expr, TopLevel};
-use parser::internment::LocalIntern;
 
 use crate::destruct_algebra;
 
@@ -77,48 +75,52 @@ impl Maths for Value {
             _ => todo!(),
         }
     }
+}
 
-    fn mul(&self, other: &Self) -> Value {
-        match (self, other) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs * rhs),
-            (Value::Array(lhs), Value::Number(rhs)) => {
-                if rhs.fract() != 0.0 {
-                    // RuntimeError::ValueError
-                }
-                let mut out = Vec::new();
-                for _ in 0..(*rhs as usize) {
-                    out.extend(lhs.iter().cloned());
-                }
-                Value::Array(out)
-            }
-            (Value::String(s), Value::Number(n)) => {
-                if n.fract() != 0.0 {
-                    // RuntimeError::ValueError
-                }
-                let mut out = String::new();
-
-                for _ in 0..(*n as usize) {
-                    out.push_str(s);
-                }
-
-                Value::String(out)
-            }
-            _ => todo!(),
-        }
+fn mul(left: &Expr, right: &Value, variables: &mut Variables) -> Result<Value, RuntimeError> {
+    let factor = *match right {
+        Value::Number(n) => n,
+        _ => Err(RuntimeError::TypeMismatch(
+            "number".to_string(),
+            right.to_type().to_string(),
+        ))?,
+    };
+    let mut out = left.construct(variables)?;
+    if let Value::Number(n) = out {
+        return Ok(Value::Number(n * factor));
     }
+    if factor.fract() != 0.0 {
+        return Err(RuntimeError::ValueError(
+            "Can only multiply numbers by fractional number".to_string(),
+        ));
+    }
+    let n = factor as usize;
+    for _ in 0..(n - 1) {
+        out = out.add(&left.construct(variables)?);
+    }
+    Ok(out)
 }
 
 pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeError> {
     let mut value = input;
     for trans in top_level.transformations {
-        let mut env = HashMap::new();
+        let mut env = Variables::new();
         match trans {
             Forced {
                 destruct,
                 construct,
             } => {
-                destruct.destruct(&value, &mut env).unwrap();
-                value = construct.construct(&env)?;
+                destruct.destruct(&value, &mut env)?;
+                value = construct.construct(&mut env)?;
+
+                for (name, value) in env.polyidents.iter() {
+                    if !value.is_empty() {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Polyident {} was used more times in the destruct pattern than in the construct pattern",
+                            name
+                        )));
+                    }
+                }
             }
         }
     }
@@ -126,10 +128,7 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
 }
 
 impl Structure for Expr {
-    fn construct(
-        &self,
-        variables: &HashMap<LocalIntern<String>, Value>,
-    ) -> Result<Value, RuntimeError> {
+    fn construct(&self, variables: &mut Variables) -> Result<Value, RuntimeError> {
         match self {
             Expr::Number(n) => Ok(Value::Number(*n)),
             Expr::String(s, _) => Ok(Value::String(s.to_owned())), // btw we can make strings localintern
@@ -144,15 +143,19 @@ impl Structure for Expr {
                     .collect::<Result<_, _>>()?,
             )),
             Expr::Ident(i) => variables
-                .get(i)
+                .get(*i)
                 .cloned()
                 .ok_or_else(|| RuntimeError::ValueError(format!("Identifier {} not found", i))),
+
+            Expr::PolyIdent(i) => variables.take_polyident(*i)?.ok_or_else(|| {
+                RuntimeError::ValueError(format!("Poly-identifier {} not found", i))
+            }),
             Expr::Operator(op, a, b) => {
                 use parser::ast::Operator::*;
                 match op {
                     Add => Ok(a.construct(variables)?.add(&b.construct(variables)?)),
                     Sub => Ok(a.construct(variables)?.sub(&b.construct(variables)?)),
-                    Mul => Ok(a.construct(variables)?.mul(&b.construct(variables)?)),
+                    Mul => Ok(mul(a, &b.construct(variables)?, variables)?),
                     Div => Ok(a.construct(variables)?.div(&b.construct(variables)?)),
                 }
             }
@@ -176,7 +179,7 @@ impl Structure for Expr {
     fn destruct(
         &self,
         value: &Value,
-        variables: &mut HashMap<LocalIntern<String>, Value>,
+        variables: &mut Variables,
     ) -> Result<Option<Value>, RuntimeError> {
         match &self {
             Expr::Number(n) => {
@@ -268,14 +271,19 @@ impl Structure for Expr {
                 }
             }
             Expr::Ident(i) => {
-                variables.insert(*i, value.clone());
+                variables.insert(*i, value.clone())?;
                 Ok(None)
             }
+            Expr::PolyIdent(i) => {
+                variables.insert_polyident(*i, value.clone())?;
+                Ok(None)
+            }
+
             Expr::Operator(op, left, right) => {
                 use parser::ast::Operator::*;
                 match (
-                    left.construct(&HashMap::new()),
-                    right.construct(&HashMap::new()),
+                    left.construct(&mut Variables::new()),
+                    right.construct(&mut Variables::new()),
                 ) {
                     (Ok(a), Ok(b)) => {
                         // incase some patterns both destruct and give a value (like @ in rust)
@@ -285,7 +293,7 @@ impl Structure for Expr {
                         let res = match op {
                             Add => a.add(&b),
                             Sub => a.sub(&b),
-                            Mul => a.mul(&b),
+                            Mul => mul(left, &b, variables)?,
                             Div => a.div(&b),
                         };
                         if &res == value {

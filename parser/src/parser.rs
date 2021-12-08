@@ -153,6 +153,14 @@ impl<'a> Lexer<'a> {
             }
 
             Tokens::Ident(s) => Expr::Ident(s),
+            Tokens::Star => {
+                let ident = if let Tokens::Ident(i) = self.ensure_next().data {
+                    i
+                } else {
+                    self.throw_error(LangErrorT::SyntaxError, "Expected identifier after `*`");
+                };
+                Expr::PolyIdent(ident)
+            }
             Tokens::Underscore => Expr::Any,
 
             Tokens::Lparen => {

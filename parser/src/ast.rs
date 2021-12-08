@@ -57,6 +57,7 @@ pub enum Expr {
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
     Ident(LocalIntern<String>),
+    PolyIdent(LocalIntern<String>),
     Operator(Operator, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOperator, Box<Expr>),
     Cast(Box<Expr>, Type, Type),

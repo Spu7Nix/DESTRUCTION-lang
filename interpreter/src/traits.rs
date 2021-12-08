@@ -17,16 +17,84 @@ pub trait Maths {
     fn add(&self, other: &Self) -> Value;
     fn sub(&self, other: &Self) -> Value;
     fn div(&self, other: &Self) -> Value;
-    fn mul(&self, other: &Self) -> Value;
 }
 
-pub type Variables = HashMap<LocalIntern<String>, Value>;
+#[derive(Debug)]
+pub struct Variables {
+    idents: HashMap<LocalIntern<String>, Value>,
+    pub polyidents: HashMap<LocalIntern<String>, Vec<Value>>,
+}
 
 pub trait Structure {
-    fn construct(&self, variables: &Variables) -> Result<Value, RuntimeError>;
+    fn construct(&self, variables: &mut Variables) -> Result<Value, RuntimeError>;
     fn destruct(
         &self,
         value: &Value,
         variables: &mut Variables,
     ) -> Result<Option<Value>, RuntimeError>;
+}
+
+impl Variables {
+    pub fn new() -> Variables {
+        Variables {
+            idents: HashMap::new(),
+            polyidents: HashMap::new(),
+        }
+    }
+    pub fn insert(&mut self, key: LocalIntern<String>, value: Value) -> Result<(), RuntimeError> {
+        if let Some(a) = self.idents.get(&key) {
+            if a != &value {
+                Err(RuntimeError::ValueError(format!(
+                    "Variable {} already has a value different from {:?}",
+                    key, value
+                )))
+            } else {
+                Ok(())
+            }
+        } else {
+            self.idents.insert(key, value);
+            Ok(())
+        }
+    }
+    pub fn get(&self, i: LocalIntern<String>) -> Option<&Value> {
+        self.idents.get(&i)
+    }
+
+    pub fn insert_polyident(
+        &mut self,
+        key: LocalIntern<String>,
+        value: Value,
+    ) -> Result<(), RuntimeError> {
+        if let Some(a) = self.polyidents.get_mut(&key) {
+            a.push(value);
+            Ok(())
+        } else {
+            self.polyidents.insert(key, vec![value]);
+            Ok(())
+        }
+    }
+
+    pub fn take_polyident(
+        &mut self,
+        i: LocalIntern<String>,
+    ) -> Result<Option<Value>, RuntimeError> {
+        if let Some(v) = self.polyidents.get_mut(&i) {
+            if v.is_empty() {
+                Err(RuntimeError::ValueError(format!(
+                    "Polyident {} is used up",
+                    i
+                )))
+            } else {
+                Ok(Some(v.remove(0)))
+            }
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl Default for Variables {
+    fn default() -> Self {
+        Self::new()
+    }
 }

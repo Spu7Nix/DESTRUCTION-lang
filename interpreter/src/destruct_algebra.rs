@@ -185,9 +185,13 @@ pub fn mul_right_destruct(
     target_val: &Value,
     variables: &mut Variables,
 ) -> Result<(), RuntimeError> {
-    let target_val = match (right, target_val) {
+    match (right, target_val) {
         // x * n1 = n2
-        (Value::Number(n1), Value::Number(n2)) => Value::Number(n2 / n1),
+        (Value::Number(n1), Value::Number(n2)) => {
+            let target_val = Value::Number(n2 / n1);
+            left.destruct(&target_val, variables)?;
+            Ok(())
+        }
         (Value::Number(n1), Value::Array(a2)) => {
             if n1.fract() != 0.0 {
                 return Err(RuntimeError::ValueError(format!(
@@ -210,14 +214,13 @@ pub fn mul_right_destruct(
                 )));
             }
             let len = a2.len() / n;
-            let vec = a2[..len].to_vec();
-            for (i, el) in a2.iter().enumerate() {
-                if vec[i % len] != *el {
-                    return Err(RuntimeError::PatternMismatch(format!("Element {:?} at index {:?} of array {:?} does not match element {:?} at index {:?} of array {:?}", el, i, a2, vec[i % len], i % len, vec)));
-                }
+
+            for i in 0..n {
+                let target = &Value::Array(a2[i * len..(i + 1) * len].to_vec());
+                left.destruct(target, variables)?;
             }
 
-            Value::Array(vec)
+            Ok(())
         }
 
         (Value::Number(n1), Value::String(s2)) => {
@@ -242,15 +245,13 @@ pub fn mul_right_destruct(
                 )));
             }
             let len = s2.len() / n;
-            let vec = s2[..len].to_string();
-            for (i, c) in s2.bytes().enumerate() {
-                // since .len() is the bytes
-                if vec.as_bytes()[i % len] != c {
-                    return Err(RuntimeError::PatternMismatch(format!("Character {:?} at index {:?} of string {:?} does not match character {:?} at index {:?} of string {:?}", c as char, i, s2, vec.as_bytes()[i % len] as char, i % len, vec)));
-                }
+
+            for i in 0..n {
+                let target = &Value::String(s2[i * len..(i + 1) * len].to_string());
+                left.destruct(target, variables)?;
             }
 
-            Value::String(vec)
+            Ok(())
         }
 
         _ => {
@@ -259,10 +260,7 @@ pub fn mul_right_destruct(
                 right, target_val
             )))
         }
-    };
-
-    left.destruct(&target_val, variables)?;
-    Ok(())
+    }
 }
 
 pub fn div_left_destruct(
