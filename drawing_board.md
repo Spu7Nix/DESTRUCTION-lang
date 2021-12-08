@@ -6,6 +6,11 @@ i split it up into each member so theres not weird merge conflict issues.
 ## Camila's section
 -------------------
 
+	two-way casting
+	`a::str -> int`
+
+	use | as a statement separater instead of newline or just nothing.
+	
 
 ## Sput's section
 -------------------

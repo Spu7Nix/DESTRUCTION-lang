@@ -285,8 +285,6 @@ impl Structure for Expr {
             }
             Expr::Cast(exp, to, from) => {
                 exp.destruct(&value.cast(from, to)?, variables)
-                //todo!();
-                //TODO: destructure casting (idk how to do)
             }
         }
     }

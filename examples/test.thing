@@ -1,1 +1,1 @@
-(a::#number ~> #string) -> a + 3
+a -> a | (b) -> b

@@ -46,17 +46,38 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    pub fn parse(&mut self) -> TopLevel {
-        let mut top_level = TopLevel {
-            transformations: Vec::new(),
-        };
+    pub fn parse_transforms(&mut self) -> Vec<Transformation> {
+        let mut transformations = Vec::new();
 
         loop {
-            if self.peek().is_none() {
-                break;
-            }
-            top_level.transformations.push(self.parse_transform());
+            transformations.push(self.parse_transform());
+
+            match self.peek() {
+                Some(Token {data: t, .. }) if t == Tokens::Pipe => self.next_token(),
+                _ => break
+            };
         }
+        transformations
+    }
+
+    pub fn parse(&mut self) -> TopLevel {
+
+        let mut transformations = Vec::new();
+
+        if self.peek().is_some() {
+            transformations = self.parse_transforms();
+            if let Some(t) = self.peek() {
+                self.throw_error(
+                    LangErrorT::SyntaxError,
+                    &format!("Unexpected token: {:?}", t.data),
+                );
+            }
+        }
+
+        let top_level = TopLevel {
+            transformations,
+        };
+
 
         top_level
     }
@@ -77,11 +98,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn expect(&mut self, token: Tokens) -> () {
-        if let Some(Token { data: _token, .. }) = self.peek() {
-            self.next_token();
-        } else {
-            self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token))
-        }
+        match self.peek() {
+            Some(Token { data: t, .. }) if t == token => self.next_token(),
+            _ => self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token))
+        };
     }
 
     fn parse_expr(&mut self) -> Expr {
@@ -371,6 +391,9 @@ pub enum Tokens {
 
     #[token("~>")]
     WavyArrow,
+
+    #[token("|")]
+    Pipe,
 
     #[token(";")]
     Semi,
