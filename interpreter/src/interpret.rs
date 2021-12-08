@@ -1,4 +1,5 @@
 use parser::ast::{Type, UnaryOperator};
+use parser::internment::LocalIntern;
 
 use crate::error::RuntimeError;
 use crate::traits::{Maths, Structure, Value, Variables};
@@ -103,15 +104,24 @@ fn mul(left: &Expr, right: &Value, variables: &mut Variables) -> Result<Value, R
 
 pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeError> {
     let mut value = input;
-    for trans in top_level.transformations {
+    let func = top_level
+        .functions
+        .get(&LocalIntern::new("main".to_string()))
+        .ok_or_else(|| RuntimeError::ValueError("Missing `main` function".to_string()))?;
+    run_func(func, &mut value)?;
+    Ok(value)
+}
+
+fn run_func(func: &[parser::ast::Transformation], value: &mut Value) -> Result<(), RuntimeError> {
+    for trans in func {
         let mut env = Variables::new();
         match trans {
             Forced {
                 destruct,
                 construct,
             } => {
-                destruct.destruct(&value, &mut env)?;
-                value = construct.construct(&mut env)?;
+                destruct.destruct(&*value, &mut env)?;
+                *value = construct.construct(&mut env)?;
 
                 for (name, value) in env.polyidents.iter() {
                     if !value.is_empty() {
@@ -124,7 +134,7 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
             }
         }
     }
-    Ok(value)
+    Ok(())
 }
 
 impl Structure for Expr {

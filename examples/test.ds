@@ -1,0 +1,7 @@
+main := 
+    a -> a
+    | a -> a
+    | a -> a;
+
+num_from_str := a -> a::#string ~> #number;
+    

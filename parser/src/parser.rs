@@ -1,6 +1,7 @@
 use crate::ast::{Expr, Operator, StringFlag, TopLevel, Transformation, Type, UnaryOperator};
 use crate::error::{LangError, LangErrorT};
 use logos::Logos;
+use std::collections::HashMap;
 use std::{
     fmt::{Debug, Display},
     path::PathBuf,
@@ -45,33 +46,43 @@ impl<'a> Lexer<'a> {
             .unwrap_or_else(|| self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input"))
     }
 
-    pub fn parse_transforms(&mut self) -> Vec<Transformation> {
-        let mut transformations = Vec::new();
+    pub fn parse(&mut self) -> TopLevel {
+        let mut functions = HashMap::new();
 
         loop {
-            transformations.push(self.parse_transform());
-            self.expect(Tokens::Semi);
-            if self.peek() == None {
-                break;
+            let name = match self.next_token() {
+                Some(Token {
+                    data: Tokens::Ident(i),
+                    ..
+                }) => i,
+                Some(_) => self.throw_error(LangErrorT::SyntaxError, "Expected function name"),
+                None => break,
             };
-        }
-        transformations
-    }
 
-    pub fn parse(&mut self) -> TopLevel {
-        let mut transformations = Vec::new();
+            self.expect(Tokens::Define);
 
-        if self.peek().is_some() {
-            transformations = self.parse_transforms();
-            if let Some(t) = self.peek() {
-                self.throw_error(
-                    LangErrorT::SyntaxError,
-                    &format!("Unexpected token: {:?}", t.data),
-                );
+            let mut transformations = Vec::new();
+
+            loop {
+                transformations.push(self.parse_transform());
+
+                match self.next_token() {
+                    Some(Token {
+                        data: Tokens::Semi, ..
+                    }) => break,
+                    Some(Token {
+                        data: Tokens::Pipe, ..
+                    }) => (),
+                    a => self.throw_error(
+                        LangErrorT::SyntaxError,
+                        &format!("Expected ';' or '|', found {:?}", a),
+                    ),
+                }
             }
+            functions.insert(name, transformations);
         }
 
-        TopLevel { transformations }
+        TopLevel { functions }
     }
 
     fn parse_maths(&mut self, operator: Tokens, lhs: Expr, rhs: Expr) -> Expr {
@@ -92,7 +103,11 @@ impl<'a> Lexer<'a> {
     fn expect(&mut self, token: Tokens) {
         match self.peek() {
             Some(Token { data: t, .. }) if t == token => self.next_token(),
-            _ => self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token)),
+            Some(Token { data: t, .. }) => self.throw_error(
+                LangErrorT::SyntaxError,
+                &format!("Expected {:?}, found {:?}", token, t),
+            ),
+            None => self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token)),
         };
     }
 
@@ -171,23 +186,24 @@ impl<'a> Lexer<'a> {
                 }) = self.peek()
                 {
                     self.next_token();
-                    return expr;
-                }
-                self.expect(Tokens::Comma);
-                let mut exprs = vec![expr];
-                loop {
-                    exprs.push(self.parse_expr());
-                    match self.ensure_next().data {
-                        Tokens::Comma => (),
-                        Tokens::Rparen => break,
+                    expr
+                } else {
+                    self.expect(Tokens::Comma);
+                    let mut exprs = vec![expr];
+                    loop {
+                        exprs.push(self.parse_expr());
+                        match self.ensure_next().data {
+                            Tokens::Comma => (),
+                            Tokens::Rparen => break,
 
-                        token => self.throw_error(
-                            LangErrorT::SyntaxError,
-                            &format!("Expected tokens `)` or `,`, found {:?}", token),
-                        ),
+                            token => self.throw_error(
+                                LangErrorT::SyntaxError,
+                                &format!("Expected tokens `)` or `,`, found {:?}", token),
+                            ),
+                        }
                     }
+                    Expr::Tuple(exprs)
                 }
-                Expr::Tuple(exprs)
             }
 
             token => self.throw_error(
@@ -482,6 +498,9 @@ pub enum Tokens {
 
     #[token(">=")]
     GreaterThanEqual,
+
+    #[token(":=")]
+    Define,
 
     // Keywords and literals
     #[token("let")]

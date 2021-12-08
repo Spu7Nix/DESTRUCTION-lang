@@ -1,6 +1,6 @@
 use internment::LocalIntern;
-use std::fmt;
 use std::str::FromStr;
+use std::{collections::HashMap, fmt};
 
 use crate::{
     error::{LangError, LangErrorT},
@@ -86,7 +86,7 @@ pub enum UnaryOperator {
 
 #[derive(Debug)]
 pub struct TopLevel {
-    pub transformations: Vec<Transformation>,
+    pub functions: HashMap<LocalIntern<String>, Vec<Transformation>>,
 }
 
 impl FromStr for TopLevel {
