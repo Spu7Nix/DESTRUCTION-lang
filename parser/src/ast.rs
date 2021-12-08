@@ -58,6 +58,7 @@ pub enum Expr {
     UnaryOp(UnaryOperator, Box<Expr>),
     Cast(Box<Expr>, Type, Type),
     Bool(bool),
+    Any, // _
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

@@ -155,6 +155,7 @@ impl Structure for Expr {
                     _ => Err(RuntimeError::ValueErrorT),
                 }
             },
+            Expr::Any => Err(RuntimeError::ValueErrorT),
         }
     }
 
@@ -313,6 +314,7 @@ impl Structure for Expr {
                 };
                 val.destruct(&target_value, variables)
             },
+            Expr::Any => Ok(None),
             
         }
     }

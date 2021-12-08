@@ -155,6 +155,7 @@ impl<'a> Lexer<'a> {
             }
 
             Tokens::Ident(s) => Expr::Ident(s),
+            Tokens::Underscore => Expr::Any,
 
             Tokens::Lparen => {
                 let expr = self.parse_expr();
