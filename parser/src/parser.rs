@@ -51,9 +51,8 @@ impl<'a> Lexer<'a> {
         loop {
             transformations.push(self.parse_transform());
             self.expect(Tokens::Semi);
-            match self.peek() {
-                None => break,
-                _ => (),
+            if self.peek() == None {
+                break;
             };
         }
         transformations
@@ -72,9 +71,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let top_level = TopLevel { transformations };
-
-        top_level
+        TopLevel { transformations }
     }
 
     fn parse_maths(&mut self, operator: Tokens, lhs: Expr, rhs: Expr) -> Expr {
@@ -92,7 +89,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn expect(&mut self, token: Tokens) -> () {
+    fn expect(&mut self, token: Tokens) {
         match self.peek() {
             Some(Token { data: t, .. }) if t == token => self.next_token(),
             _ => self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token)),

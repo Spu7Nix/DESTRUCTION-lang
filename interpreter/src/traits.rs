@@ -10,7 +10,6 @@ pub enum Value {
     String(String),
     Array(Vec<Value>),
     Tuple(Vec<Value>),
-    Ident(LocalIntern<String>),
     Bool(bool),
 }
 

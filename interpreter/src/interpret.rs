@@ -17,7 +17,6 @@ impl Value {
             Value::Tuple(_) => &Type::Tuple,
             Value::Array(_) => &Type::Array,
             Value::Bool(_) => &Type::Bool,
-            Value::Ident(_) => unreachable!(),
         }
     }
     fn cast(&self, to: &Type, from: &Type) -> Result<Value, RuntimeError> {
@@ -147,10 +146,7 @@ impl Structure for Expr {
             Expr::Ident(i) => variables
                 .get(i)
                 .cloned()
-                .ok_or(RuntimeError::ValueError(format!(
-                    "Identifier {} not found",
-                    i
-                ))),
+                .ok_or_else(|| RuntimeError::ValueError(format!("Identifier {} not found", i))),
             Expr::Operator(op, a, b) => {
                 use parser::ast::Operator::*;
                 match op {
@@ -243,7 +239,7 @@ impl Structure for Expr {
 
                     Ok(arr_val.map(Value::Array))
                 } else {
-                    Err(RuntimeError::PatternMismatch(format!("Expected array")))
+                    Err(RuntimeError::PatternMismatch("Expected array".to_string()))
                 }
             }
             Expr::Tuple(t) => {
@@ -268,7 +264,7 @@ impl Structure for Expr {
 
                     Ok(arr_val.map(Value::Tuple))
                 } else {
-                    Err(RuntimeError::PatternMismatch(format!("Expected tuple")))
+                    Err(RuntimeError::PatternMismatch("Expected tuple".to_string()))
                 }
             }
             Expr::Ident(i) => {
@@ -337,9 +333,9 @@ impl Structure for Expr {
                         Ok(None)
                     }
 
-                    _ => Err(RuntimeError::ValueError(format!(
-                        "Cannot destruct expression with two unknowns",
-                    ))),
+                    _ => Err(RuntimeError::ValueError(
+                        "Cannot destruct expression with two unknowns".to_string(),
+                    )),
                 }
             }
             Expr::Cast(exp, to, from) => exp.destruct(&value.cast(from, to)?, variables),
