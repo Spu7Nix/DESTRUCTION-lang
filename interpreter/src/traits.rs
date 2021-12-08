@@ -11,6 +11,7 @@ pub enum Value {
     Array(Vec<Value>),
     Tuple(Vec<Value>),
     Ident(LocalIntern<String>),
+    Bool(bool),
 }
 
 pub trait Maths {

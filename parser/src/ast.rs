@@ -16,7 +16,8 @@ pub enum Type {
     String,
     Number,
     Tuple,
-    Array
+    Array,
+    Bool,
 }
 
 impl fmt::Display for Type {
@@ -25,7 +26,8 @@ impl fmt::Display for Type {
             Type::String => write!(f, "string"),
             Type::Number => write!(f, "number"),
             Type::Tuple => write!(f, "tuple"),
-            Type::Array => write!(f, "array")
+            Type::Array => write!(f, "array"),
+            Type::Bool => write!(f, "bool"),
         }
     }
 }
@@ -39,6 +41,7 @@ impl FromStr for Type {
             "number" => Ok(Type::Number),
             "tuple" => Ok(Type::Tuple),
             "array" => Ok(Type::Array),
+            "bool" => Ok(Type::Bool),
             _ => Err(Self::Err::SyntaxError)
         }
     }
@@ -52,8 +55,9 @@ pub enum Expr {
     Tuple(Vec<Expr>),
     Ident(LocalIntern<String>),
     Operator(Operator, Box<Expr>, Box<Expr>),
-    Cast(Box<Expr>, Type, Type)
-
+    UnaryOp(UnaryOperator, Box<Expr>),
+    Cast(Box<Expr>, Type, Type),
+    Bool(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -67,6 +71,12 @@ pub enum Operator {
     Sub,
     Mul,
     Div,
+}
+
+#[derive(Debug)]
+pub enum UnaryOperator {
+    Neg,
+    Not,
 }
 
 #[derive(Debug)]

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Operator, StringFlag, TopLevel, Transformation, Type};
+use crate::ast::{Expr, Operator, StringFlag, TopLevel, Transformation, Type, UnaryOperator};
 use crate::error::{LangError, LangErrorT};
 use logos::Logos;
 use std::{
@@ -51,10 +51,10 @@ impl<'a> Lexer<'a> {
 
         loop {
             transformations.push(self.parse_transform());
-
+            self.expect(Tokens::Semi);
             match self.peek() {
-                Some(Token {data: t, .. }) if t == Tokens::Pipe => self.next_token(),
-                _ => break
+                None => break,
+                _ => (),
             };
         }
         transformations
@@ -105,10 +105,22 @@ impl<'a> Lexer<'a> {
     }
 
     fn parse_expr(&mut self) -> Expr {
-        let next_token = self.ensure_next();
-
-        let first = match next_token.data {
+        let unary_operator = match self.peek() {
+            Some(Token { data: Tokens::Minus, .. }) => {
+                self.next_token();
+                Some(UnaryOperator::Neg)
+            },
+            Some(Token { data: Tokens::Exclamation, .. }) => {
+                self.next_token();
+                Some(UnaryOperator::Not)
+            },
+            _ => None,
+        };
+        
+        let first = match self.ensure_next().data {
             Tokens::Number(n) => Expr::Number(n),
+            Tokens::False => Expr::Bool(false),
+            Tokens::True => Expr::Bool(true),
             Tokens::StringLiteral(mut s) => {
                 let flag = s.1;
                 s.0.remove(0);
@@ -154,6 +166,12 @@ impl<'a> Lexer<'a> {
                 LangErrorT::SyntaxError,
                 &format!("Unexpected token: {:?}", token),
             ),
+        };
+
+        let first = if let Some(uo) = unary_operator {
+            Expr::UnaryOp(uo, box first)
+        } else {
+            first
         };
 
         match self.peek() {
@@ -412,6 +430,9 @@ pub enum Tokens {
 
     #[token("?")]
     Question,
+
+    #[token("!")]
+    Exclamation,
 
     #[token("==")]
     Equal,

@@ -1,9 +1,8 @@
-use parser::ast::Type;
+use parser::ast::{Type, UnaryOperator};
 use std::collections::HashMap;
-use std::fmt;
 
 use crate::error::RuntimeError;
-use crate::traits::{Maths, Structure, Value, Variables};
+use crate::traits::{Maths, Structure, Value};
 use parser::ast::Transformation::Forced;
 use parser::ast::{Expr, TopLevel};
 use parser::internment::LocalIntern;
@@ -17,6 +16,7 @@ impl Value {
             Value::Number(_) => &Type::Number,
             Value::Tuple(_) => &Type::Tuple,
             Value::Array(_) => &Type::Array,
+            Value::Bool(_) => &Type::Bool,
             Value::Ident(_) => unreachable!()
         }
     }
@@ -35,6 +35,7 @@ impl Value {
             (Type::String, v) => Ok(Self::String(format!("{:?}", v))), //TODO: something better than just debug
             (Type::Array, Value::String(s)) => Ok(Self::Array(s.chars().map(|x| Value::String(String::from(x))).collect())),
             (Type::Tuple, Value::String(s)) => Ok(Self::Tuple(s.chars().map(|x| Value::String(String::from(x))).collect())),
+            // boolean casting?
 
             _ => unreachable!()
         }
@@ -145,6 +146,15 @@ impl Structure for Expr {
             Expr::Cast(exp, to, from) => {
                 exp.construct(variables)?.cast(to, from)
             }
+            Expr::Bool(b) => Ok(Value::Bool(*b)),
+            Expr::UnaryOp(op, val) => {
+                let val = val.construct(variables)?;
+                match (op, val) {
+                    (UnaryOperator::Neg, Value::Number(n)) => Ok(Value::Number(-n)),
+                    (UnaryOperator::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
+                    _ => Err(RuntimeError::ValueErrorT),
+                }
+            },
         }
     }
 
@@ -161,6 +171,13 @@ impl Structure for Expr {
                     Err(RuntimeError::PatternMismatchT)
                 }
             }
+            Expr::Bool(b) => {
+                if value == &Value::Bool(*b) {
+                    Ok(Some(Value::Bool(*b)))
+                } else {
+                    Err(RuntimeError::PatternMismatchT)
+                }
+            },
             Expr::String(s, _) => {
                 if let Value::String(s2) = value {
                     if s == s2 {
@@ -286,6 +303,17 @@ impl Structure for Expr {
             Expr::Cast(exp, to, from) => {
                 exp.destruct(&value.cast(from, to)?, variables)
             }
+            Expr::UnaryOp(op, val) => {
+                let target_value = match (op, value) {
+                    // -x = n
+                    (UnaryOperator::Neg, Value::Number(n)) => Value::Number(-n),
+                    // !x = b
+                    (UnaryOperator::Not, Value::Bool(b)) => Value::Bool(!b),
+                    _ => return Err(RuntimeError::ValueErrorT),
+                };
+                val.destruct(&target_value, variables)
+            },
+            
         }
     }
 }
