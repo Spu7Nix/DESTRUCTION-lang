@@ -247,7 +247,7 @@ impl Structure for Expr {
                 }
             }
             Expr::Tuple(t) => {
-                if let Value::Array(t2) = value {
+                if let Value::Tuple(t2) = value {
                     if t.len() != t2.len() {
                         return Err(RuntimeError::PatternMismatch(format!(
                             "Expected tuple of length {}",

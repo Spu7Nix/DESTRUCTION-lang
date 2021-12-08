@@ -148,7 +148,7 @@ impl<'a> Lexer<'a> {
 
                         token => self.throw_error(
                             LangErrorT::SyntaxError,
-                            &format!("Expected tokens `Rbracket` or `Comma`, found {:?}", token),
+                            &format!("Expected tokens `]` or `,`, found {:?}", token),
                         ),
                     }
                 }
@@ -160,8 +160,29 @@ impl<'a> Lexer<'a> {
 
             Tokens::Lparen => {
                 let expr = self.parse_expr();
-                self.expect(Tokens::Rparen);
-                expr
+                if let Some(Token {
+                    data: Tokens::Rparen,
+                    span: _,
+                }) = self.peek()
+                {
+                    self.next_token();
+                    return expr;
+                }
+                self.expect(Tokens::Comma);
+                let mut exprs = vec![expr];
+                loop {
+                    exprs.push(self.parse_expr());
+                    match self.ensure_next().data {
+                        Tokens::Comma => (),
+                        Tokens::Rparen => break,
+
+                        token => self.throw_error(
+                            LangErrorT::SyntaxError,
+                            &format!("Expected tokens `)` or `,`, found {:?}", token),
+                        ),
+                    }
+                }
+                Expr::Tuple(exprs)
             }
 
             token => self.throw_error(
