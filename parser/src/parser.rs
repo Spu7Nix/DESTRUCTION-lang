@@ -41,9 +41,8 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn ensure_next(&mut self) -> Token {
-        self.next_token().unwrap_or_else(|| {
-            self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input")
-        })
+        self.next_token()
+            .unwrap_or_else(|| self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input"))
     }
 
     pub fn parse_transforms(&mut self) -> Vec<Transformation> {
@@ -61,7 +60,6 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn parse(&mut self) -> TopLevel {
-
         let mut transformations = Vec::new();
 
         if self.peek().is_some() {
@@ -74,10 +72,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        let top_level = TopLevel {
-            transformations,
-        };
-
+        let top_level = TopLevel { transformations };
 
         top_level
     }
@@ -100,23 +95,29 @@ impl<'a> Lexer<'a> {
     fn expect(&mut self, token: Tokens) -> () {
         match self.peek() {
             Some(Token { data: t, .. }) if t == token => self.next_token(),
-            _ => self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token))
+            _ => self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token)),
         };
     }
 
     fn parse_expr(&mut self) -> Expr {
         let unary_operator = match self.peek() {
-            Some(Token { data: Tokens::Minus, .. }) => {
+            Some(Token {
+                data: Tokens::Minus,
+                ..
+            }) => {
                 self.next_token();
                 Some(UnaryOperator::Neg)
-            },
-            Some(Token { data: Tokens::Exclamation, .. }) => {
+            }
+            Some(Token {
+                data: Tokens::Exclamation,
+                ..
+            }) => {
                 self.next_token();
                 Some(UnaryOperator::Not)
-            },
+            }
             _ => None,
         };
-        
+
         let first = match self.ensure_next().data {
             Tokens::Number(n) => Expr::Number(n),
             Tokens::False => Expr::Bool(false),
@@ -183,7 +184,7 @@ impl<'a> Lexer<'a> {
                 self.next_token();
                 let rhs = self.parse_expr();
                 self.parse_maths(operator, first, rhs)
-            },
+            }
 
             Some(Token {
                 data: Tokens::DoubleColon,
@@ -196,15 +197,17 @@ impl<'a> Lexer<'a> {
                     Tokens::Type(s) => {
                         let mut s2 = s.to_string();
                         s2.remove(0);
-                        s2.parse::<Type>().unwrap_or_else(|_| self.throw_error(
-                            LangErrorT::SyntaxError,
-                            &format!("{:?} is not a valid type", s),
-                        ))
-                    },
+                        s2.parse::<Type>().unwrap_or_else(|_| {
+                            self.throw_error(
+                                LangErrorT::SyntaxError,
+                                &format!("{:?} is not a valid type", s),
+                            )
+                        })
+                    }
                     token => self.throw_error(
                         LangErrorT::SyntaxError,
                         &format!("Expected type, found {:?}", token),
-                    )
+                    ),
                 };
 
                 self.expect(Tokens::WavyArrow);
@@ -213,17 +216,18 @@ impl<'a> Lexer<'a> {
                     Tokens::Type(s) => {
                         let mut s2 = s.to_string();
                         s2.remove(0);
-                        s2.parse::<Type>().unwrap_or_else(|_| self.throw_error(
-                            LangErrorT::SyntaxError,
-                            &format!("{:?} is not a valid type", s2),
-                        ))
-                    },
+                        s2.parse::<Type>().unwrap_or_else(|_| {
+                            self.throw_error(
+                                LangErrorT::SyntaxError,
+                                &format!("{:?} is not a valid type", s2),
+                            )
+                        })
+                    }
                     token => self.throw_error(
                         LangErrorT::SyntaxError,
                         &format!("Expected type, found {:?}", token),
-                    )
+                    ),
                 };
-
 
                 Expr::Cast(box first, to, from)
             }

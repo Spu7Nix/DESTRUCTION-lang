@@ -1,4 +1,4 @@
-use std::{path::PathBuf, fmt::Display, error::Error};
+use std::{error::Error, fmt::Display, path::PathBuf};
 
 #[derive(Debug)]
 pub enum LangError {
@@ -10,7 +10,7 @@ pub enum LangError {
 }
 
 pub enum LangErrorT {
-    SyntaxError
+    SyntaxError,
 }
 
 impl Error for LangError {}

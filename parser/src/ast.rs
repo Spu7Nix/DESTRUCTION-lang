@@ -1,8 +1,11 @@
 use internment::LocalIntern;
-use std::str::FromStr;
 use std::fmt;
+use std::str::FromStr;
 
-use crate::{error::{LangError, LangErrorT}, parser::{Lexer, Sp}};
+use crate::{
+    error::{LangError, LangErrorT},
+    parser::{Lexer, Sp},
+};
 
 type Expression = Sp<Expr>;
 
@@ -42,7 +45,7 @@ impl FromStr for Type {
             "tuple" => Ok(Type::Tuple),
             "array" => Ok(Type::Array),
             "bool" => Ok(Type::Bool),
-            _ => Err(Self::Err::SyntaxError)
+            _ => Err(Self::Err::SyntaxError),
         }
     }
 }

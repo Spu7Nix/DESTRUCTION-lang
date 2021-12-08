@@ -17,27 +17,38 @@ impl Value {
             Value::Tuple(_) => &Type::Tuple,
             Value::Array(_) => &Type::Array,
             Value::Bool(_) => &Type::Bool,
-            Value::Ident(_) => unreachable!()
+            Value::Ident(_) => unreachable!(),
         }
     }
     fn cast(&self, to: &Type, from: &Type) -> Result<Value, RuntimeError> {
-
         if from != self.to_type() {
-            return Err(RuntimeError::TypeMismatchT(from.to_string(), self.to_type().to_string()));
+            return Err(RuntimeError::TypeMismatch(
+                from.to_string(),
+                self.to_type().to_string(),
+            ));
         }
         if to == self.to_type() {
             return Ok(self.clone());
         }
         match (to, self) {
-            (Type::Number, Value::String(s)) => Ok(Self::Number(s.parse::<f64>().ok().unwrap_or(f64::NAN))),
-            (Type::Number, Value::Array(_) | Value::Tuple(_)) => Err(RuntimeError::ValueErrorT),
-            (Type::Array | Type::Tuple, Value::Number(_)) => Err(RuntimeError::ValueErrorT),
+            (Type::Number, Value::String(s)) => {
+                Ok(Self::Number(s.parse::<f64>().ok().unwrap_or(f64::NAN)))
+            }
+            (Type::Number, Value::Array(_) | Value::Tuple(_)) => Err(RuntimeError::ValueError(
+                "Cannot convert array or tuple to number".to_string(),
+            )),
+            (Type::Array | Type::Tuple, Value::Number(_)) => Err(RuntimeError::ValueError(
+                "Cannot convert number to array or tuple".to_string(),
+            )),
             (Type::String, v) => Ok(Self::String(format!("{:?}", v))), //TODO: something better than just debug
-            (Type::Array, Value::String(s)) => Ok(Self::Array(s.chars().map(|x| Value::String(String::from(x))).collect())),
-            (Type::Tuple, Value::String(s)) => Ok(Self::Tuple(s.chars().map(|x| Value::String(String::from(x))).collect())),
+            (Type::Array, Value::String(s)) => Ok(Self::Array(
+                s.chars().map(|x| Value::String(String::from(x))).collect(),
+            )),
+            (Type::Tuple, Value::String(s)) => Ok(Self::Tuple(
+                s.chars().map(|x| Value::String(String::from(x))).collect(),
+            )),
             // boolean casting?
-
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -133,7 +144,13 @@ impl Structure for Expr {
                     .map(|e| -> Result<_, _> { e.construct(variables) })
                     .collect::<Result<_, _>>()?,
             )),
-            Expr::Ident(i) => variables.get(i).cloned().ok_or(RuntimeError::ValueErrorT),
+            Expr::Ident(i) => variables
+                .get(i)
+                .cloned()
+                .ok_or(RuntimeError::ValueError(format!(
+                    "Identifier {} not found",
+                    i
+                ))),
             Expr::Operator(op, a, b) => {
                 use parser::ast::Operator::*;
                 match op {
@@ -143,19 +160,20 @@ impl Structure for Expr {
                     Div => Ok(a.construct(variables)?.div(&b.construct(variables)?)),
                 }
             }
-            Expr::Cast(exp, to, from) => {
-                exp.construct(variables)?.cast(to, from)
-            }
+            Expr::Cast(exp, to, from) => exp.construct(variables)?.cast(to, from),
             Expr::Bool(b) => Ok(Value::Bool(*b)),
             Expr::UnaryOp(op, val) => {
                 let val = val.construct(variables)?;
                 match (op, val) {
                     (UnaryOperator::Neg, Value::Number(n)) => Ok(Value::Number(-n)),
                     (UnaryOperator::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
-                    _ => Err(RuntimeError::ValueErrorT),
+                    (a, val) => Err(RuntimeError::ValueError(format!(
+                        "Cannot apply unary operator {:?} to {:?}",
+                        a, val
+                    ))),
                 }
-            },
-            Expr::Any => Err(RuntimeError::ValueErrorT),
+            }
+            Expr::Any => Err(RuntimeError::ValueError("Cannot construct `_`".to_string())),
         }
     }
 
@@ -169,32 +187,47 @@ impl Structure for Expr {
                 if value == &Value::Number(*n) {
                     Ok(Some(Value::Number(*n)))
                 } else {
-                    Err(RuntimeError::PatternMismatchT)
+                    Err(RuntimeError::PatternMismatch(format!(
+                        "Expected number {:?}",
+                        n
+                    )))
                 }
             }
             Expr::Bool(b) => {
                 if value == &Value::Bool(*b) {
                     Ok(Some(Value::Bool(*b)))
                 } else {
-                    Err(RuntimeError::PatternMismatchT)
+                    Err(RuntimeError::PatternMismatch(format!(
+                        "Expected bool {:?}",
+                        b
+                    )))
                 }
-            },
+            }
             Expr::String(s, _) => {
                 if let Value::String(s2) = value {
                     if s == s2 {
                         Ok(Some(Value::String(s.to_owned())))
                     } else {
-                        Err(RuntimeError::PatternMismatchT)
+                        Err(RuntimeError::PatternMismatch(format!(
+                            "Expected string {:?}",
+                            s
+                        )))
                     }
                 } else {
-                    Err(RuntimeError::PatternMismatchT)
+                    Err(RuntimeError::PatternMismatch(format!(
+                        "Expected string {:?}",
+                        s
+                    )))
                 }
             }
             Expr::Array(arr) => {
                 // i fugured out the destruct thing!!
                 if let Value::Array(arr2) = value {
                     if arr.len() != arr2.len() {
-                        return Err(RuntimeError::PatternMismatchT);
+                        return Err(RuntimeError::PatternMismatch(format!(
+                            "Expected array of length {}",
+                            arr.len()
+                        )));
                     }
                     let mut arr_val = Some(Vec::new());
 
@@ -210,13 +243,16 @@ impl Structure for Expr {
 
                     Ok(arr_val.map(Value::Array))
                 } else {
-                    Err(RuntimeError::PatternMismatchT)
+                    Err(RuntimeError::PatternMismatch(format!("Expected array")))
                 }
             }
             Expr::Tuple(t) => {
                 if let Value::Array(t2) = value {
                     if t.len() != t2.len() {
-                        return Err(RuntimeError::PatternMismatchT);
+                        return Err(RuntimeError::PatternMismatch(format!(
+                            "Expected tuple of length {}",
+                            t.len()
+                        )));
                     }
                     let mut arr_val = Some(Vec::new());
 
@@ -232,7 +268,7 @@ impl Structure for Expr {
 
                     Ok(arr_val.map(Value::Tuple))
                 } else {
-                    Err(RuntimeError::PatternMismatchT)
+                    Err(RuntimeError::PatternMismatch(format!("Expected tuple")))
                 }
             }
             Expr::Ident(i) => {
@@ -259,7 +295,10 @@ impl Structure for Expr {
                         if &res == value {
                             Ok(Some(res))
                         } else {
-                            Err(RuntimeError::PatternMismatchT)
+                            Err(RuntimeError::PatternMismatch(format!(
+                                "Expected {:?} from destruct expression, found {:?}",
+                                value, res
+                            )))
                         }
                     }
 
@@ -298,24 +337,28 @@ impl Structure for Expr {
                         Ok(None)
                     }
 
-                    _ => Err(RuntimeError::ValueErrorT),
+                    _ => Err(RuntimeError::ValueError(format!(
+                        "Cannot destruct expression with two unknowns",
+                    ))),
                 }
             }
-            Expr::Cast(exp, to, from) => {
-                exp.destruct(&value.cast(from, to)?, variables)
-            }
+            Expr::Cast(exp, to, from) => exp.destruct(&value.cast(from, to)?, variables),
             Expr::UnaryOp(op, val) => {
                 let target_value = match (op, value) {
                     // -x = n
                     (UnaryOperator::Neg, Value::Number(n)) => Value::Number(-n),
                     // !x = b
                     (UnaryOperator::Not, Value::Bool(b)) => Value::Bool(!b),
-                    _ => return Err(RuntimeError::ValueErrorT),
+                    (op, v) => {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Cannot apply unary operator {:?} to {:?}",
+                            op, v
+                        )))
+                    }
                 };
                 val.destruct(&target_value, variables)
-            },
+            }
             Expr::Any => Ok(None),
-            
         }
     }
 }
