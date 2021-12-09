@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use parser::{ast::Transformation, internment::LocalIntern};
 
 use crate::error::RuntimeError;
 
-#[derive(Debug, Clone, PartialEq)] // vec isnt Copy ye ik i just had oto chek chek
+#[derive(Clone, PartialEq, Debug)] // vec isnt Copy ye ik i just had oto chek chek
 pub enum Value {
     Number(f64),
     String(String),
@@ -13,10 +13,43 @@ pub enum Value {
     Bool(bool),
 }
 
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Value::Number(n) => write!(f, "{}", n),
+            Value::String(s) => write!(f, "{}", s),
+            Value::Array(a) => {
+                write!(f, "[")?;
+                for (i, v) in a.iter().enumerate() {
+                    if i != 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", v)?;
+                }
+                write!(f, "]")
+            }
+            Value::Tuple(a) => {
+                write!(f, "(")?;
+                for (i, v) in a.iter().enumerate() {
+                    if i != 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", v)?;
+                }
+                write!(f, ")")
+            }
+            Value::Bool(b) => write!(f, "{}", b),
+        }
+    }
+}
+
+
 pub trait Maths {
-    fn add(&self, other: &Self) -> Value;
-    fn sub(&self, other: &Self) -> Value;
-    fn div(&self, other: &Self) -> Value;
+    fn add(&self, other: &Self) -> Result<Value, RuntimeError>;
+    fn sub(&self, other: &Self) -> Result<Value, RuntimeError>;
+    fn div(&self, other: &Self) -> Result<Value, RuntimeError>;
+    fn and(&self, other: &Self) -> Result<Value, RuntimeError>;
+    fn or(&self, other: &Self) -> Result<Value, RuntimeError>;
 }
 
 #[derive(Debug)]
@@ -52,7 +85,7 @@ impl Variables {
         if let Some(a) = self.idents.get(&key) {
             if a != &value {
                 Err(RuntimeError::ValueError(format!(
-                    "Variable {} already has a value different from {:?}",
+                    "Variable {} already has a value different from {}",
                     key, value
                 )))
             } else {

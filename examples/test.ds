@@ -1,8 +1,3 @@
 main := 
-    _ -> [1, 2, 1, 2, 1, 2]
-    | tuplearr (a, b) -> (a, b);
-
-num_from_str := a -> a::#string ~> #number;
-str_from_num := a -> a::#number ~> #string;
-
-tuplearr := (a, b) -> [a, b] * 3;
+    _ -> true
+    | a || true -> a;

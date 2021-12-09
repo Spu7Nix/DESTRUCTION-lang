@@ -77,6 +77,8 @@ pub enum Operator {
     Sub,
     Mul,
     Div,
+    And,
+    Or,
 }
 
 #[derive(Debug)]
@@ -96,6 +98,6 @@ impl FromStr for TopLevel {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lexer = Lexer::new(s, None);
 
-        Ok(lexer.parse())
+        lexer.parse()
     }
 }

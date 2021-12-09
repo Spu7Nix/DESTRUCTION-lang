@@ -38,7 +38,7 @@ impl Value {
             (Type::Array | Type::Tuple, Value::Number(_)) => Err(RuntimeError::ValueError(
                 "Cannot convert number to array or tuple".to_string(),
             )),
-            (Type::String, v) => Ok(Self::String(format!("{:?}", v))), //TODO: something better than just debug
+            (Type::String, v) => Ok(Self::String(format!("{}", v))),
             (Type::Array, Value::String(s)) => Ok(Self::Array(
                 s.chars().map(|x| Value::String(String::from(x))).collect(),
             )),
@@ -52,28 +52,57 @@ impl Value {
 }
 
 impl Maths for Value {
-    fn add(&self, other: &Self) -> Value {
+    fn add(&self, other: &Self) -> Result<Value, RuntimeError> {
         match (self, other) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),
-            (Value::String(lhs), Value::String(rhs)) => Value::String(lhs.to_owned() + rhs),
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs + rhs)),
+            (Value::String(lhs), Value::String(rhs)) => Ok(Value::String(lhs.to_owned() + rhs)),
             (Value::Array(lhs), Value::Array(rhs)) => {
-                Value::Array([lhs.to_owned(), rhs.to_owned()].concat())
+                Ok(Value::Array([lhs.to_owned(), rhs.to_owned()].concat()))
             }
-            _ => todo!(),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot add {:?} and {:?}",
+                a, b
+            ))),
         }
     }
 
-    fn sub(&self, other: &Self) -> Value {
+    fn sub(&self, other: &Self) -> Result<Value, RuntimeError> {
         match (self, other) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs - rhs),
-            _ => todo!(),
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs - rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot subtract {:?} and {:?}",
+                a, b
+            ))),
         }
     }
 
-    fn div(&self, other: &Self) -> Value {
+    fn div(&self, other: &Self) -> Result<Value, RuntimeError> {
         match (self, other) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs / rhs),
-            _ => todo!(),
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs / rhs)),
+            _ => Err(RuntimeError::ValueError(format!(
+                "Cannot divide {:?} and {:?}",
+                self, other
+            ))),
+        }
+    }
+
+    fn and(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => Ok(Value::Bool(*lhs && *rhs)),
+            _ => Err(RuntimeError::ValueError(format!(
+                "Cannot and {:?} and {:?}",
+                self, other
+            ))),
+        }
+    }
+
+    fn or(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => Ok(Value::Bool(*lhs || *rhs)),
+            _ => Err(RuntimeError::ValueError(format!(
+                "Cannot or {:?} and {:?}",
+                self, other
+            ))),
         }
     }
 }
@@ -104,7 +133,7 @@ fn mul(
     }
     let n = factor as usize;
     for _ in 0..(n - 1) {
-        out = out.add(&left.construct(variables, functions)?);
+        out = out.add(&left.construct(variables, functions)?)?;
     }
     Ok(out)
 }
@@ -215,10 +244,10 @@ impl Structure for Expr {
                 match op {
                     Add => Ok(a
                         .construct(variables, functions)?
-                        .add(&b.construct(variables, functions)?)),
+                        .add(&b.construct(variables, functions)?)?),
                     Sub => Ok(a
                         .construct(variables, functions)?
-                        .sub(&b.construct(variables, functions)?)),
+                        .sub(&b.construct(variables, functions)?)?),
                     Mul => Ok(mul(
                         a,
                         &b.construct(variables, functions)?,
@@ -227,7 +256,13 @@ impl Structure for Expr {
                     )?),
                     Div => Ok(a
                         .construct(variables, functions)?
-                        .div(&b.construct(variables, functions)?)),
+                        .div(&b.construct(variables, functions)?)?),
+                    And => Ok(a
+                        .construct(variables, functions)?
+                        .and(&b.construct(variables, functions)?)?),
+                    Or => Ok(a
+                        .construct(variables, functions)?
+                        .or(&b.construct(variables, functions)?)?),
                 }
             }
             Expr::Cast(exp, to, from) => exp.construct(variables, functions)?.cast(to, from),
@@ -238,7 +273,7 @@ impl Structure for Expr {
                     (UnaryOperator::Neg, Value::Number(n)) => Ok(Value::Number(-n)),
                     (UnaryOperator::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
                     (a, val) => Err(RuntimeError::ValueError(format!(
-                        "Cannot apply unary operator {:?} to {:?}",
+                        "Cannot apply unary operator {:?} to {}",
                         a, val
                     ))),
                 }
@@ -364,16 +399,18 @@ impl Structure for Expr {
                         right.destruct(&b, variables, functions)?;
 
                         let res = match op {
-                            Add => a.add(&b),
-                            Sub => a.sub(&b),
+                            Add => a.add(&b)?,
+                            Sub => a.sub(&b)?,
                             Mul => mul(left, &b, variables, functions)?,
-                            Div => a.div(&b),
+                            Div => a.div(&b)?,
+                            And => a.and(&b)?,
+                            Or => a.or(&b)?,
                         };
                         if &res == value {
                             Ok(Some(res))
                         } else {
                             Err(RuntimeError::PatternMismatch(format!(
-                                "Expected {:?} from destruct expression, found {:?}",
+                                "Expected {} from destruct expression, found {}",
                                 value, res
                             )))
                         }
@@ -393,6 +430,12 @@ impl Structure for Expr {
                             Div => destruct_algebra::div_left_destruct(
                                 &left, &*right, value, variables, functions,
                             )?,
+                            And => destruct_algebra::and_destruct(
+                                &left, &*right, value, variables, functions,
+                            )?,
+                            Or => destruct_algebra::or_destruct(
+                                &left, &*right, value, variables, functions,
+                            )?,
                         };
                         Ok(None)
                     }
@@ -408,6 +451,12 @@ impl Structure for Expr {
                                 &right, &*left, value, variables, functions,
                             )?,
                             Div => destruct_algebra::div_right_destruct(
+                                &right, &*left, value, variables, functions,
+                            )?,
+                            And => destruct_algebra::and_destruct(
+                                &right, &*left, value, variables, functions,
+                            )?,
+                            Or => destruct_algebra::or_destruct(
                                 &right, &*left, value, variables, functions,
                             )?,
                         };
@@ -428,7 +477,7 @@ impl Structure for Expr {
                     (UnaryOperator::Not, Value::Bool(b)) => Value::Bool(!b),
                     (op, v) => {
                         return Err(RuntimeError::ValueError(format!(
-                            "Cannot apply unary operator {:?} to {:?}",
+                            "Cannot apply unary operator {:?} to {}",
                             op, v
                         )))
                     }

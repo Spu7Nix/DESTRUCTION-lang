@@ -11,7 +11,7 @@ type Token = Sp<Tokens>;
 
 macro_rules! operator_pattern {
     () => {
-        Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash
+        Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash | Tokens::And | Tokens::Or
     };
 }
 
@@ -47,12 +47,25 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn ensure_next(&mut self) -> Token {
-        self.next_token()
-            .unwrap_or_else(|| self.throw_error(LangErrorT::SyntaxError, "Unexpected end of input"))
+    pub fn err(&self, error: LangErrorT, message: &str) -> LangError {
+        match error {
+            LangErrorT::SyntaxError => LangError::SyntaxError {
+                file: self.file.to_owned(),
+                pos: self.pos,
+                message: message.to_owned(),
+            },
+        }
     }
 
-    pub fn parse(&mut self) -> TopLevel {
+    pub fn ensure_next(&mut self) -> Result<Token, LangError> {
+        match self.next_token() {
+            Some(t) => Ok(t),
+            None => Err(self.err(LangErrorT::SyntaxError, "Unexpected end of input")),
+        }
+            
+    }
+
+    pub fn parse(&mut self) -> Result<TopLevel, LangError> {
         let mut functions = HashMap::new();
 
         loop {
@@ -61,16 +74,16 @@ impl<'a> Lexer<'a> {
                     data: Tokens::Ident(i),
                     ..
                 }) => i,
-                Some(_) => self.throw_error(LangErrorT::SyntaxError, "Expected function name"),
+                Some(_) => return Err(self.err(LangErrorT::SyntaxError, "Expected function name")),
                 None => break,
             };
 
-            self.expect(Tokens::Define);
+            self.expect(Tokens::Define)?;
 
             let mut transformations = Vec::new();
 
             loop {
-                transformations.push(self.parse_transform());
+                transformations.push(self.parse_transform()?);
 
                 match self.next_token() {
                     Some(Token {
@@ -79,45 +92,45 @@ impl<'a> Lexer<'a> {
                     Some(Token {
                         data: Tokens::Pipe, ..
                     }) => (),
-                    a => self.throw_error(
+                    a => return Err(self.err(
                         LangErrorT::SyntaxError,
                         &format!("Expected ';' or '|', found {:?}", a),
-                    ),
+                    )),
                 }
             }
             functions.insert(name, transformations);
         }
 
-        TopLevel { functions }
+        Ok(TopLevel { functions })
     }
 
-    fn parse_maths(&mut self, operator: Tokens, lhs: Expr, rhs: Expr) -> Expr {
+    fn parse_maths(&mut self, operator: Tokens, lhs: Expr, rhs: Expr) -> Result<Expr, LangError> {
         match operator {
-            op @ (Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash) => {
+            op @ operator_pattern!() => {
                 let lhs = box lhs;
                 let rhs = box rhs;
-                Expr::Operator(op.into(), lhs, rhs)
+                Ok(Expr::Operator(op.into(), lhs, rhs))
             }
 
             t => {
-                println!("{:?}", t);
-                todo!()
+                Err(self.err(LangErrorT::SyntaxError, &format!("Expected operator, found {:?}", t)))
             }
         }
     }
 
-    fn expect(&mut self, token: Tokens) {
+    fn expect(&mut self, token: Tokens) -> Result<(), LangError> {
         match self.peek() {
             Some(Token { data: t, .. }) if t == token => self.next_token(),
-            Some(Token { data: t, .. }) => self.throw_error(
+            Some(Token { data: t, .. }) => return Err(self.err(
                 LangErrorT::SyntaxError,
                 &format!("Expected {:?}, found {:?}", token, t),
-            ),
-            None => self.throw_error(LangErrorT::SyntaxError, &format!("Expected {:?}", token)),
+            )),
+            None => return Err(self.err(LangErrorT::SyntaxError, &format!("Expected {:?}", token))),
         };
+        Ok(())
     }
 
-    fn parse_expr(&mut self) -> Expr {
+    fn parse_expr(&mut self) -> Result<Expr, LangError> {
         let unary_operator = match self.peek() {
             Some(Token {
                 data: Tokens::Minus,
@@ -136,7 +149,7 @@ impl<'a> Lexer<'a> {
             _ => None,
         };
 
-        let first = match self.ensure_next().data {
+        let first = match self.ensure_next()?.data {
             Tokens::Number(n) => Expr::Number(n),
             Tokens::False => Expr::Bool(false),
             Tokens::True => Expr::Bool(true),
@@ -154,23 +167,24 @@ impl<'a> Lexer<'a> {
                 }) = self.peek()
                 {
                     self.next_token();
-                    return Expr::Array(Vec::new());
-                }
+                    Expr::Array(Vec::new())
+                } else {
 
-                let mut exprs = Vec::new();
-                loop {
-                    exprs.push(self.parse_expr());
-                    match self.ensure_next().data {
-                        Tokens::Comma => (),
-                        Tokens::Rbracket => break,
+                    let mut exprs = Vec::new();
+                    loop {
+                        exprs.push(self.parse_expr()?);
+                        match self.ensure_next()?.data {
+                            Tokens::Comma => (),
+                            Tokens::Rbracket => break,
 
-                        token => self.throw_error(
-                            LangErrorT::SyntaxError,
-                            &format!("Expected tokens `]` or `,`, found {:?}", token),
-                        ),
+                            token => return Err(self.err(
+                                LangErrorT::SyntaxError,
+                                &format!("Expected tokens `]` or `,`, found {:?}", token),
+                            )),
+                        }
                     }
+                    Expr::Array(exprs)
                 }
-                Expr::Array(exprs)
             }
 
             Tokens::Ident(s) => match self.peek() {
@@ -187,20 +201,20 @@ impl<'a> Lexer<'a> {
                         | Tokens::DoubleColon,
                     ..
                 }) => Expr::Ident(s),
-                _ => Expr::Call(s, self.parse_expr().into()),
+                _ => Expr::Call(s, self.parse_expr()?.into()),
             },
             Tokens::Star => {
-                let ident = if let Tokens::Ident(i) = self.ensure_next().data {
+                let ident = if let Tokens::Ident(i) = self.ensure_next()?.data {
                     i
                 } else {
-                    self.throw_error(LangErrorT::SyntaxError, "Expected identifier after `*`");
+                    return Err(self.err(LangErrorT::SyntaxError, "Expected identifier after `*`"));
                 };
                 Expr::PolyIdent(ident)
             }
             Tokens::Underscore => Expr::Any,
 
             Tokens::Lparen => {
-                let expr = self.parse_expr();
+                let expr = self.parse_expr()?;
                 if let Some(Token {
                     data: Tokens::Rparen,
                     span: _,
@@ -209,28 +223,28 @@ impl<'a> Lexer<'a> {
                     self.next_token();
                     expr
                 } else {
-                    self.expect(Tokens::Comma);
+                    self.expect(Tokens::Comma)?;
                     let mut exprs = vec![expr];
                     loop {
-                        exprs.push(self.parse_expr());
-                        match self.ensure_next().data {
+                        exprs.push(self.parse_expr()?);
+                        match self.ensure_next()?.data {
                             Tokens::Comma => (),
                             Tokens::Rparen => break,
 
-                            token => self.throw_error(
+                            token => return Err(self.err(
                                 LangErrorT::SyntaxError,
                                 &format!("Expected tokens `)` or `,`, found {:?}", token),
-                            ),
+                            )),
                         }
                     }
                     Expr::Tuple(exprs)
                 }
             }
 
-            token => self.throw_error(
+            token => return Err(self.err(
                 LangErrorT::SyntaxError,
                 &format!("Unexpected token: {:?}", token),
-            ),
+            )),
         };
 
         let first = if let Some(uo) = unary_operator {
@@ -245,7 +259,7 @@ impl<'a> Lexer<'a> {
                 ..
             }) => {
                 self.next_token();
-                let rhs = self.parse_expr();
+                let rhs = self.parse_expr()?;
                 self.parse_maths(operator, first, rhs)
             }
 
@@ -256,69 +270,63 @@ impl<'a> Lexer<'a> {
                 // cast
                 // v::#from ~> #to
                 self.next_token();
-                let from = match self.ensure_next().data {
+                let from = match self.ensure_next()?.data {
                     Tokens::Type(s) => {
                         let mut s2 = s.to_string();
                         s2.remove(0);
-                        s2.parse::<Type>().unwrap_or_else(|_| {
-                            self.throw_error(
-                                LangErrorT::SyntaxError,
-                                &format!("{:?} is not a valid type", s),
-                            )
-                        })
+                        match s2.parse::<Type>() {
+                            Err(e) => {
+                                return Err(self.err(
+                                    e,
+                                    &format!("{:?} is not a valid type", s),
+                                ))
+                            }
+                            Ok(t) => t,
+                        }
+                        
                     }
-                    token => self.throw_error(
+                    token => return Err(self.err(
                         LangErrorT::SyntaxError,
                         &format!("Expected type, found {:?}", token),
-                    ),
+                    )),
                 };
 
-                self.expect(Tokens::WavyArrow);
+                self.expect(Tokens::WavyArrow)?;
 
-                let to = match self.ensure_next().data {
+                let to = match self.ensure_next()?.data {
                     Tokens::Type(s) => {
                         let mut s2 = s.to_string();
                         s2.remove(0);
-                        s2.parse::<Type>().unwrap_or_else(|_| {
-                            self.throw_error(
-                                LangErrorT::SyntaxError,
-                                &format!("{:?} is not a valid type", s2),
-                            )
-                        })
+                        match s2.parse::<Type>() {
+                            Err(e) => {
+                                return Err(self.err(
+                                    e,
+                                    &format!("{:?} is not a valid type", s),
+                                ))
+                            }
+                            Ok(t) => t,
+                        }
                     }
-                    token => self.throw_error(
+                    token => return Err(self.err(
                         LangErrorT::SyntaxError,
                         &format!("Expected type, found {:?}", token),
-                    ),
+                    )),
                 };
 
-                Expr::Cast(box first, to, from)
+                Ok(Expr::Cast(box first, to, from))
             }
-            _ => first,
+            _ => Ok(first),
         }
     }
 
-    pub fn parse_transform(&mut self) -> Transformation {
-        let destruct = self.parse_expr();
-        self.expect(Tokens::Rarrow);
-        let construct = self.parse_expr();
-        Transformation::Forced {
+    pub fn parse_transform(&mut self) -> Result<Transformation, LangError> {
+        let destruct = self.parse_expr()?;
+        self.expect(Tokens::Rarrow)?;
+        let construct = self.parse_expr()?;
+        Ok(Transformation::Forced {
             destruct,
             construct,
-        }
-    }
-
-    pub fn throw_error(&self, error: LangErrorT, message: &str) -> ! {
-        let error = match error {
-            LangErrorT::SyntaxError => LangError::SyntaxError {
-                file: self.file.to_owned(),
-                pos: self.pos,
-                message: message.to_owned(),
-            },
-        };
-        println!("{}", error);
-
-        std::process::exit(1)
+        })
     }
 
     pub fn peek(&self) -> Option<Token> {
@@ -426,6 +434,8 @@ impl From<Tokens> for Operator {
             Tokens::Plus => Operator::Add,
             Tokens::Star => Operator::Mul, // uhhh
             Tokens::Fslash => Operator::Div,
+            Tokens::And => Operator::And,
+            Tokens::Or => Operator::Or,
             _ => panic!(),
         }
     }
@@ -447,6 +457,12 @@ pub enum Tokens {
 
     #[token("/")]
     Fslash,
+
+    #[token("&&")]
+    And,
+
+    #[token("||")]
+    Or,
 
     #[token("_")]
     Underscore,
@@ -581,22 +597,4 @@ pub enum Tokens {
     #[error]
     #[regex(r"[ \t\f\r]+", logos::skip)]
     Error,
-}
-
-#[cfg(test)]
-pub mod test {
-    use super::*;
-
-    #[test]
-    fn tokens() {
-        dbg!(Lexer::new(
-            r#"
-[a, b] -> [b, a]
-[a, b] -> a + b
-    
-        "#,
-            None,
-        )
-        .parse());
-    }
 }
