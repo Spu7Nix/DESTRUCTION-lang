@@ -12,6 +12,11 @@ type Expression = Sp<Expr>;
 #[derive(Debug)]
 pub enum Transformation {
     Forced { destruct: Expr, construct: Expr },
+    Compound(Vec<Transformation>),
+    Try {
+        first: Box<Transformation>,
+        otherwise: Box<Transformation>,
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

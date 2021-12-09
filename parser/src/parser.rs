@@ -320,13 +320,51 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn parse_transform(&mut self) -> Result<Transformation, LangError> {
-        let destruct = self.parse_expr()?;
-        self.expect(Tokens::Rarrow)?;
-        let construct = self.parse_expr()?;
-        Ok(Transformation::Forced {
-            destruct,
-            construct,
-        })
+        match self.peek() {
+            Some(Token {
+                data: Tokens::Lbrace,
+                ..
+            }) => {
+                self.next_token();
+                let mut transforms = Vec::new();
+                loop {
+                    transforms.push(self.parse_transform()?);
+                    match self.ensure_next()?.data {
+                        Tokens::Pipe => (),
+                        Tokens::Rbrace => break,
+
+                        token => return Err(self.err(
+                            LangErrorT::SyntaxError,
+                            &format!("Expected tokens `}}` or `|`, found {:?}", token),
+                        )),
+                    }
+                }
+                Ok(Transformation::Compound(transforms))
+            }
+
+            // if ?, make try transform
+            Some(Token {
+                data: Tokens::Question,
+                ..
+            }) => {
+                self.next_token();
+                let first = box self.parse_transform()?;
+                self.expect(Tokens::Colon)?;
+                let otherwise = box self.parse_transform()?;
+                Ok(Transformation::Try{ first, otherwise })
+            }
+
+            _ => {
+                let destruct = self.parse_expr()?;
+                self.expect(Tokens::Rarrow)?;
+                let construct = self.parse_expr()?;
+                Ok(Transformation::Forced {
+                    destruct,
+                    construct,
+                })
+            }
+        }
+        
     }
 
     pub fn peek(&self) -> Option<Token> {

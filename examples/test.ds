@@ -1,3 +1,5 @@
-main := 
-    _ -> true
-    | a || true -> a;
+main := a ;
+
+if := 
+    ? (true, then, _) -> then 
+    : (false, _, else) -> else;

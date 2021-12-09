@@ -1,4 +1,6 @@
-use parser::ast::{Type, UnaryOperator};
+use std::collections::HashMap;
+
+use parser::ast::{Type, UnaryOperator, Transformation};
 use parser::internment::LocalIntern;
 
 use crate::error::RuntimeError;
@@ -148,68 +150,98 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
 
 fn run_func(
     func: LocalIntern<String>,
-    mut value: Value,
+    value: Value,
     functions: &Functions,
 ) -> Result<Value, RuntimeError> {
-    for trans in functions
+    let transforms = functions
         .get(&func)
-        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?
-    {
-        let mut env = Variables::new();
-        match trans {
-            Forced {
-                destruct,
-                construct,
-            } => {
-                destruct.destruct(&value, &mut env, functions)?;
-                value = construct.construct(&mut env, functions)?;
+        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?;
+    run_tranforms(transforms, value, functions)
+}
 
-                for (name, value) in env.polyidents.iter() {
-                    if !value.is_empty() {
-                        return Err(RuntimeError::ValueError(format!(
-                            "Polyident {} was used more times in the destruct pattern than in the construct pattern",
-                            name
-                        )));
-                    }
-                }
-            }
-        }
+fn run_tranforms(transforms: &[Transformation], mut value: Value, functions: &HashMap<LocalIntern<String>, Vec<parser::ast::Transformation>>) -> Result<Value, RuntimeError> {
+    for trans in transforms {
+        value = run_single_transform(trans, value, functions)?
     }
     Ok(value)
 }
 
-fn reverse_run_func(
-    func: LocalIntern<String>,
-    mut output: Value,
-    functions: &Functions,
-) -> Result<Value, RuntimeError> {
-    for trans in functions
-        .get(&func)
-        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?
-        .iter()
-        .rev()
-    {
-        let mut env = Variables::new();
-        match trans {
-            Forced {
-                destruct,
-                construct,
-            } => {
-                construct.destruct(&output, &mut env, functions)?;
-                output = destruct.construct(&mut env, functions)?;
+fn run_single_transform(trans: &Transformation, value: Value, functions: &HashMap<LocalIntern<String>, Vec<Transformation>>) -> Result<Value, RuntimeError> {
+    Ok(match trans {
+        Forced {
+            destruct,
+            construct,
+        } => {
+            let mut env = Variables::new();
+            destruct.destruct(&value, &mut env, functions)?;
+            let out = construct.construct(&mut env, functions)?;
 
-                for (name, value) in env.polyidents.iter() {
-                    if !value.is_empty() {
-                        return Err(RuntimeError::ValueError(format!(
-                            "Polyident {} was used more times in the construct pattern than in the destruct pattern",
-                            name
-                        )));
-                    }
+            for (name, value) in env.polyidents.iter() {
+                if !value.is_empty() {
+                    return Err(RuntimeError::ValueError(format!(
+                        "Polyident {} was used more times in the destruct pattern than in the construct pattern",
+                        name
+                    )));
                 }
             }
+            out
         }
+        parser::ast::Transformation::Compound(v) => run_tranforms(v, value, functions)?,
+        parser::ast::Transformation::Try { first, otherwise } => {
+            match run_single_transform(first, value.clone(), functions) {
+                Ok(v) => v,
+                Err(_) => run_single_transform(otherwise, value, functions)?,
+            }
+        }
+    })
+}
+
+fn reverse_run_func(
+    func: LocalIntern<String>,
+    output: Value,
+    functions: &Functions,
+) -> Result<Value, RuntimeError> {
+    let transforms = functions
+        .get(&func)
+        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?;
+    reverse_run_transforms(transforms, output, functions)
+}
+
+fn reverse_run_transforms(transforms: &[Transformation], mut output: Value, functions: &Functions) -> Result<Value, RuntimeError> {
+    for trans in transforms.iter().rev() {
+        output = reverse_run_singe_tranform(trans, output, functions)?
     }
     Ok(output)
+}
+
+fn reverse_run_singe_tranform(trans: &Transformation, output: Value, functions: &HashMap<LocalIntern<String>, Vec<Transformation>>) -> Result<Value, RuntimeError> {
+    Ok(match trans {
+        Forced {
+            destruct,
+            construct,
+        } => {
+            let mut env = Variables::new();
+            construct.destruct(&output, &mut env, functions)?;
+            let out = destruct.construct(&mut env, functions)?;
+
+            for (name, value) in env.polyidents.iter() {
+                if !value.is_empty() {
+                    return Err(RuntimeError::ValueError(format!(
+                        "Polyident {} was used more times in the construct pattern than in the destruct pattern",
+                        name
+                    )));
+                }
+            }
+            out
+        }
+        parser::ast::Transformation::Compound(v) => reverse_run_transforms(v, output, functions)?,
+        parser::ast::Transformation::Try { first, otherwise } => {
+            match reverse_run_singe_tranform(first, output.clone(), functions) {
+                Ok(v) => v,
+                Err(_) => reverse_run_singe_tranform(otherwise, output, functions)?,
+            }
+        },
+    })
 }
 
 impl Structure for Expr {
