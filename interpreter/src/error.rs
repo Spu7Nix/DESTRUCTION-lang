@@ -1,6 +1,4 @@
-use std::{error::Error, fmt::Display, path::PathBuf};
-
-use parser::parser::Lexer;
+use std::{error::Error, fmt::Display};
 
 #[derive(Debug, Clone)]
 pub enum RuntimeError {

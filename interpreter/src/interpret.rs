@@ -1,4 +1,6 @@
-use parser::ast::{Type, UnaryOperator};
+use std::collections::HashMap;
+
+use parser::ast::{Type, UnaryOperator, Transformation};
 use parser::internment::LocalIntern;
 
 use crate::error::RuntimeError;
@@ -38,7 +40,7 @@ impl Value {
             (Type::Array | Type::Tuple, Value::Number(_)) => Err(RuntimeError::ValueError(
                 "Cannot convert number to array or tuple".to_string(),
             )),
-            (Type::String, v) => Ok(Self::String(format!("{:?}", v))), //TODO: something better than just debug
+            (Type::String, v) => Ok(Self::String(format!("{}", v))),
             (Type::Array, Value::String(s)) => Ok(Self::Array(
                 s.chars().map(|x| Value::String(String::from(x))).collect(),
             )),
@@ -52,28 +54,97 @@ impl Value {
 }
 
 impl Maths for Value {
-    fn add(&self, other: &Self) -> Value {
+    fn add(&self, other: &Self) -> Result<Value, RuntimeError> {
         match (self, other) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),
-            (Value::String(lhs), Value::String(rhs)) => Value::String(lhs.to_owned() + rhs),
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs + rhs)),
+            (Value::String(lhs), Value::String(rhs)) => Ok(Value::String(lhs.to_owned() + rhs)),
             (Value::Array(lhs), Value::Array(rhs)) => {
-                Value::Array([lhs.to_owned(), rhs.to_owned()].concat())
+                Ok(Value::Array([lhs.to_owned(), rhs.to_owned()].concat()))
             }
-            _ => todo!(),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot add {:?} and {:?}",
+                a, b
+            ))),
         }
     }
 
-    fn sub(&self, other: &Self) -> Value {
+    fn sub(&self, other: &Self) -> Result<Value, RuntimeError> {
         match (self, other) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs - rhs),
-            _ => todo!(),
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs - rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot subtract {:?} and {:?}",
+                a, b
+            ))),
         }
     }
 
-    fn div(&self, other: &Self) -> Value {
+    fn div(&self, other: &Self) -> Result<Value, RuntimeError> {
         match (self, other) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs / rhs),
-            _ => todo!(),
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs / rhs)),
+            _ => Err(RuntimeError::ValueError(format!(
+                "Cannot divide {:?} and {:?}",
+                self, other
+            ))),
+        }
+    }
+
+    fn and(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => Ok(Value::Bool(*lhs && *rhs)),
+            _ => Err(RuntimeError::ValueError(format!(
+                "Cannot and {:?} and {:?}",
+                self, other
+            ))),
+        }
+    }
+
+    fn or(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Bool(lhs), Value::Bool(rhs)) => Ok(Value::Bool(*lhs || *rhs)),
+            _ => Err(RuntimeError::ValueError(format!(
+                "Cannot or {:?} and {:?}",
+                self, other
+            ))),
+        }
+    }
+
+    fn lt_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs < rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
+        }
+    }
+
+    fn gt_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs > rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
+        }
+    }
+
+    fn le_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs <= rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
+        }
+    }
+
+    fn ge_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs >= rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
         }
     }
 }
@@ -104,7 +175,7 @@ fn mul(
     }
     let n = factor as usize;
     for _ in 0..(n - 1) {
-        out = out.add(&left.construct(variables, functions)?);
+        out = out.add(&left.construct(variables, functions)?)?;
     }
     Ok(out)
 }
@@ -119,68 +190,98 @@ pub fn interpret(top_level: TopLevel, input: Value) -> Result<Value, RuntimeErro
 
 fn run_func(
     func: LocalIntern<String>,
-    mut value: Value,
+    value: Value,
     functions: &Functions,
 ) -> Result<Value, RuntimeError> {
-    for trans in functions
+    let transforms = functions
         .get(&func)
-        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?
-    {
-        let mut env = Variables::new();
-        match trans {
-            Forced {
-                destruct,
-                construct,
-            } => {
-                destruct.destruct(&value, &mut env, functions)?;
-                value = construct.construct(&mut env, functions)?;
+        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?;
+    run_tranforms(transforms, value, functions)
+}
 
-                for (name, value) in env.polyidents.iter() {
-                    if !value.is_empty() {
-                        return Err(RuntimeError::ValueError(format!(
-                            "Polyident {} was used more times in the destruct pattern than in the construct pattern",
-                            name
-                        )));
-                    }
-                }
-            }
-        }
+fn run_tranforms(transforms: &[Transformation], mut value: Value, functions: &HashMap<LocalIntern<String>, Vec<parser::ast::Transformation>>) -> Result<Value, RuntimeError> {
+    for trans in transforms {
+        value = run_single_transform(trans, value, functions)?
     }
     Ok(value)
 }
 
-fn reverse_run_func(
-    func: LocalIntern<String>,
-    mut output: Value,
-    functions: &Functions,
-) -> Result<Value, RuntimeError> {
-    for trans in functions
-        .get(&func)
-        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?
-        .iter()
-        .rev()
-    {
-        let mut env = Variables::new();
-        match trans {
-            Forced {
-                destruct,
-                construct,
-            } => {
-                construct.destruct(&output, &mut env, functions)?;
-                output = destruct.construct(&mut env, functions)?;
+fn run_single_transform(trans: &Transformation, value: Value, functions: &HashMap<LocalIntern<String>, Vec<Transformation>>) -> Result<Value, RuntimeError> {
+    Ok(match trans {
+        Forced {
+            destruct,
+            construct,
+        } => {
+            let mut env = Variables::new();
+            destruct.destruct(&value, &mut env, functions)?;
+            let out = construct.construct(&mut env, functions)?;
 
-                for (name, value) in env.polyidents.iter() {
-                    if !value.is_empty() {
-                        return Err(RuntimeError::ValueError(format!(
-                            "Polyident {} was used more times in the construct pattern than in the destruct pattern",
-                            name
-                        )));
-                    }
+            for (name, value) in env.polyidents.iter() {
+                if !value.is_empty() {
+                    return Err(RuntimeError::ValueError(format!(
+                        "Polyident {} was used more times in the destruct pattern than in the construct pattern",
+                        name
+                    )));
                 }
             }
+            out
         }
+        parser::ast::Transformation::Compound(v) => run_tranforms(v, value, functions)?,
+        parser::ast::Transformation::Try { first, otherwise } => {
+            match run_single_transform(first, value.clone(), functions) {
+                Ok(v) => v,
+                Err(_) => run_single_transform(otherwise, value, functions)?,
+            }
+        }
+    })
+}
+
+fn reverse_run_func(
+    func: LocalIntern<String>,
+    output: Value,
+    functions: &Functions,
+) -> Result<Value, RuntimeError> {
+    let transforms = functions
+        .get(&func)
+        .ok_or_else(|| RuntimeError::ValueError(format!("Missing `{}` function", func)))?;
+    reverse_run_transforms(transforms, output, functions)
+}
+
+fn reverse_run_transforms(transforms: &[Transformation], mut output: Value, functions: &Functions) -> Result<Value, RuntimeError> {
+    for trans in transforms.iter().rev() {
+        output = reverse_run_singe_tranform(trans, output, functions)?
     }
     Ok(output)
+}
+
+fn reverse_run_singe_tranform(trans: &Transformation, output: Value, functions: &HashMap<LocalIntern<String>, Vec<Transformation>>) -> Result<Value, RuntimeError> {
+    Ok(match trans {
+        Forced {
+            destruct,
+            construct,
+        } => {
+            let mut env = Variables::new();
+            construct.destruct(&output, &mut env, functions)?;
+            let out = destruct.construct(&mut env, functions)?;
+
+            for (name, value) in env.polyidents.iter() {
+                if !value.is_empty() {
+                    return Err(RuntimeError::ValueError(format!(
+                        "Polyident {} was used more times in the construct pattern than in the destruct pattern",
+                        name
+                    )));
+                }
+            }
+            out
+        }
+        parser::ast::Transformation::Compound(v) => reverse_run_transforms(v, output, functions)?,
+        parser::ast::Transformation::Try { first, otherwise } => {
+            match reverse_run_singe_tranform(first, output.clone(), functions) {
+                Ok(v) => v,
+                Err(_) => reverse_run_singe_tranform(otherwise, output, functions)?,
+            }
+        },
+    })
 }
 
 impl Structure for Expr {
@@ -215,10 +316,10 @@ impl Structure for Expr {
                 match op {
                     Add => Ok(a
                         .construct(variables, functions)?
-                        .add(&b.construct(variables, functions)?)),
+                        .add(&b.construct(variables, functions)?)?),
                     Sub => Ok(a
                         .construct(variables, functions)?
-                        .sub(&b.construct(variables, functions)?)),
+                        .sub(&b.construct(variables, functions)?)?),
                     Mul => Ok(mul(
                         a,
                         &b.construct(variables, functions)?,
@@ -227,7 +328,29 @@ impl Structure for Expr {
                     )?),
                     Div => Ok(a
                         .construct(variables, functions)?
-                        .div(&b.construct(variables, functions)?)),
+                        .div(&b.construct(variables, functions)?)?),
+                    And => Ok(a
+                        .construct(variables, functions)?
+                        .and(&b.construct(variables, functions)?)?),
+                    Or => Ok(a
+                        .construct(variables, functions)?
+                        .or(&b.construct(variables, functions)?)?),
+
+                    Eq => Ok(Value::Bool(a.construct(variables, functions)? == b.construct(variables, functions)?)),
+                    Neq => Ok(Value::Bool(a.construct(variables, functions)? != b.construct(variables, functions)?)),
+                    Lt => Ok(a
+                        .construct(variables, functions)?
+                        .lt_op(&b.construct(variables, functions)?)?),
+                    Gt => Ok(a
+                        .construct(variables, functions)?
+                        .gt_op(&b.construct(variables, functions)?)?),
+                    Le => Ok(a
+                        .construct(variables, functions)?
+                        .le_op(&b.construct(variables, functions)?)?),
+                    Ge => Ok(a
+                        .construct(variables, functions)?
+                        .ge_op(&b.construct(variables, functions)?)?),
+
                 }
             }
             Expr::Cast(exp, to, from) => exp.construct(variables, functions)?.cast(to, from),
@@ -238,7 +361,7 @@ impl Structure for Expr {
                     (UnaryOperator::Neg, Value::Number(n)) => Ok(Value::Number(-n)),
                     (UnaryOperator::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
                     (a, val) => Err(RuntimeError::ValueError(format!(
-                        "Cannot apply unary operator {:?} to {:?}",
+                        "Cannot apply unary operator {:?} to {}",
                         a, val
                     ))),
                 }
@@ -364,16 +487,24 @@ impl Structure for Expr {
                         right.destruct(&b, variables, functions)?;
 
                         let res = match op {
-                            Add => a.add(&b),
-                            Sub => a.sub(&b),
+                            Add => a.add(&b)?,
+                            Sub => a.sub(&b)?,
                             Mul => mul(left, &b, variables, functions)?,
-                            Div => a.div(&b),
+                            Div => a.div(&b)?,
+                            And => a.and(&b)?,
+                            Or => a.or(&b)?,
+                            Eq => Value::Bool(a == b),
+                            Neq => Value::Bool(a != b),
+                            Lt => a.lt_op(&b)?,
+                            Gt => a.gt_op(&b)?,
+                            Le => a.le_op(&b)?,
+                            Ge => a.ge_op(&b)?,
                         };
                         if &res == value {
                             Ok(Some(res))
                         } else {
                             Err(RuntimeError::PatternMismatch(format!(
-                                "Expected {:?} from destruct expression, found {:?}",
+                                "Expected {} from destruct expression, found {}",
                                 value, res
                             )))
                         }
@@ -393,6 +524,19 @@ impl Structure for Expr {
                             Div => destruct_algebra::div_left_destruct(
                                 &left, &*right, value, variables, functions,
                             )?,
+                            And => destruct_algebra::and_destruct(
+                                &left, &*right, value, variables, functions,
+                            )?,
+                            Or => destruct_algebra::or_destruct(
+                                &left, &*right, value, variables, functions,
+                            )?,
+                            Eq => destruct_algebra::eq_destruct(
+                                &left, &*right, value, variables, functions,
+                            )?,
+                            a => return Err(RuntimeError::PatternMismatch(format!(
+                                "This operator can not be destructed: {:?}",
+                                a
+                            ))),
                         };
                         Ok(None)
                     }
@@ -410,6 +554,19 @@ impl Structure for Expr {
                             Div => destruct_algebra::div_right_destruct(
                                 &right, &*left, value, variables, functions,
                             )?,
+                            And => destruct_algebra::and_destruct(
+                                &right, &*left, value, variables, functions,
+                            )?,
+                            Or => destruct_algebra::or_destruct(
+                                &right, &*left, value, variables, functions,
+                            )?,
+                            Eq => destruct_algebra::eq_destruct(
+                                &right, &*left, value, variables, functions,
+                            )?,
+                            a => return Err(RuntimeError::PatternMismatch(format!(
+                                "This operator can not be destructed: {:?}",
+                                a
+                            ))),
                         };
                         Ok(None)
                     }
@@ -428,7 +585,7 @@ impl Structure for Expr {
                     (UnaryOperator::Not, Value::Bool(b)) => Value::Bool(!b),
                     (op, v) => {
                         return Err(RuntimeError::ValueError(format!(
-                            "Cannot apply unary operator {:?} to {:?}",
+                            "Cannot apply unary operator {:?} to {}",
                             op, v
                         )))
                     }

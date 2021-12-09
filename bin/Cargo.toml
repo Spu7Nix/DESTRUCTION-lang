@@ -9,3 +9,4 @@ edition = "2021"
 clap = "2.34.0"
 parser = { path = "../parser" }
 interpreter = { path = "../interpreter" }
+ariadne = "0.1.3"

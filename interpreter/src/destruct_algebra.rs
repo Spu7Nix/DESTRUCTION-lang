@@ -29,15 +29,15 @@ pub fn add_left_destruct(
         (Value::Array(a1), Value::Array(a2)) => {
             if !a2.starts_with(a1) {
                 return Err(RuntimeError::PatternMismatch(format!(
-                    "Expected {:?} to start with {:?}",
-                    a2, a1
+                    "Expected {} to start with {}",
+                    Value::Array(a2.clone()), Value::Array(a1.clone())
                 )));
             }
             Value::Array(a2[a1.len()..].to_vec())
         }
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot add {:?} with something to get {:?}",
+                "Cannot add {} with something to get {}",
                 left, target_val
             )))
         }
@@ -70,15 +70,15 @@ pub fn add_right_destruct(
         (Value::Array(a1), Value::Array(a2)) => {
             if !a2.ends_with(a1) {
                 return Err(RuntimeError::PatternMismatch(format!(
-                    "Expected {:?} to end with {:?}",
-                    a2, a1
+                    "Expected {} to end with {}",
+                    Value::Array(a2.clone()), Value::Array(a1.clone())
                 )));
             }
             Value::Array(a2[..(a2.len() - a1.len())].to_vec())
         }
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot add something with {:?} to get {:?}",
+                "Cannot add something with {} to get {}",
                 right, target_val
             )))
         }
@@ -101,7 +101,7 @@ pub fn sub_left_destruct(
 
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot subtract {:?} from something to get {:?}",
+                "Cannot subtract {} from something to get {}",
                 left, target_val
             )))
         }
@@ -123,7 +123,7 @@ pub fn sub_right_destruct(
 
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot subtract something from {:?} to get {:?}",
+                "Cannot subtract something from {} to get {}",
                 right, target_val
             )))
         }
@@ -146,14 +146,14 @@ pub fn mul_left_destruct(
         (Value::Array(a1), Value::Array(a2)) => {
             if a2.len() % a1.len() != 0 {
                 return Err(RuntimeError::PatternMismatch(format!(
-                    "Length of target array {:?} is not divisible by length of destruct array {:?}",
-                    a2, a1
+                    "Length of target array {} is not divisible by length of destruct array {}",
+                    Value::Array(a2.clone()), Value::Array(a1.clone())
                 )));
             }
             let repeats = a2.len() / a1.len();
             for (i, el) in a2.iter().enumerate() {
                 if a1[i % a1.len()] != *el {
-                    return Err(RuntimeError::PatternMismatch(format!("Element {:?} at index {:?} of target array {:?} does not match element {:?} at index {:?} of destruct array {:?}", el, i, a2, a1[i % a1.len()], i % a1.len(), a1)));
+                    return Err(RuntimeError::PatternMismatch(format!("Element {} at index {} of target array {} does not match element {} at index {} of destruct array {}", el, i, Value::Array(a2.clone()), a1[i % a1.len()], i % a1.len(), Value::Array(a1.clone()))));
                 }
             }
 
@@ -161,13 +161,13 @@ pub fn mul_left_destruct(
         }
         (Value::String(s1), Value::String(s2)) => {
             if s2.len() % s1.len() != 0 {
-                return Err(RuntimeError::PatternMismatch(format!("Length of target string {:?} is not divisible by length of destruct string {:?}", s2, s1)));
+                return Err(RuntimeError::PatternMismatch(format!("Length of target string {} is not divisible by length of destruct string {}", s2, s1)));
             }
             let repeats = s2.len() / s1.len();
             for (i, c) in s2.bytes().enumerate() {
                 // since .len() is the bytes
                 if s1.as_bytes()[i % s1.len()] != c {
-                    return Err(RuntimeError::PatternMismatch(format!("Character {:?} at index {:?} of target string {:?} does not match character {:?} at index {:?} of destruct string {:?}", c as char, i, s2, s1.as_bytes()[i % s1.len()] as char, i % s1.len(), s1)));
+                    return Err(RuntimeError::PatternMismatch(format!("Character {} at index {} of target string {} does not match character {} at index {} of destruct string {}", c as char, i, s2, s1.as_bytes()[i % s1.len()] as char, i % s1.len(), s1)));
                 }
             }
             Value::Number(repeats as f64)
@@ -175,7 +175,7 @@ pub fn mul_left_destruct(
 
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot multiply {:?} with something to get {:?}",
+                "Cannot multiply {} with something to get {}",
                 left, target_val
             )))
         }
@@ -215,8 +215,8 @@ pub fn mul_right_destruct(
             }
             if a2.len() % n != 0 {
                 return Err(RuntimeError::PatternMismatch(format!(
-                    "Length of array {:?} is not divisible by number {}",
-                    a2, n
+                    "Length of array {} is not divisible by number {}",
+                    Value::Array(a2.clone()), n
                 )));
             }
             let len = a2.len() / n;
@@ -246,7 +246,7 @@ pub fn mul_right_destruct(
             }
             if s2.len() % n != 0 {
                 return Err(RuntimeError::PatternMismatch(format!(
-                    "Length of string {:?} is not divisible by number {}",
+                    "Length of string {} is not divisible by number {}",
                     s2, n
                 )));
             }
@@ -262,7 +262,7 @@ pub fn mul_right_destruct(
 
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot multiply something with {:?} to get {:?}",
+                "Cannot multiply something with {} to get {}",
                 right, target_val
             )))
         }
@@ -282,7 +282,7 @@ pub fn div_left_destruct(
 
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot divide {:?} with something to get {:?}",
+                "Cannot divide {} with something to get {}",
                 left, target_val
             )))
         }
@@ -304,7 +304,7 @@ pub fn div_right_destruct(
 
         _ => {
             return Err(RuntimeError::ValueError(format!(
-                "Cannot divide something with {:?} to get {:?}",
+                "Cannot divide something with {} to get {}",
                 right, target_val
             )))
         }
@@ -312,4 +312,86 @@ pub fn div_right_destruct(
 
     left.destruct(&target_val, variables, functions)?;
     Ok(())
+}
+
+pub fn and_destruct(
+    val: &Value,
+    expr: &Expr,
+    target_val: &Value,
+    variables: &mut Variables,
+    functions: &Functions,
+) -> Result<(), RuntimeError> {
+    match (val, target_val) {
+        (Value::Bool(true), Value::Bool(true)) => {
+            expr.destruct(&Value::Bool(true), variables, functions)?;
+            Ok(())
+        }
+        (Value::Bool(_), Value::Bool(false)) => {
+            expr.destruct(&Value::Bool(false), variables, functions)?;
+            Ok(())
+        }
+        _ => {
+            return Err(RuntimeError::ValueError(format!(
+                "Cannot && {} with something to get {}",
+                val, target_val
+            )))
+        }
+    }
+}
+
+pub fn or_destruct(
+    val: &Value,
+    expr: &Expr,
+    target_val: &Value,
+    variables: &mut Variables,
+    functions: &Functions,
+) -> Result<(), RuntimeError> {
+    match (val, target_val) {
+        (Value::Bool(false), Value::Bool(true)) => {
+            expr.destruct(&Value::Bool(true), variables, functions)?;
+            Ok(())
+        }
+        (Value::Bool(false), Value::Bool(false)) => {
+            expr.destruct(&Value::Bool(false), variables, functions)?;
+            Ok(())
+        }
+        (Value::Bool(true), Value::Bool(true)) => {
+            return Err(RuntimeError::ValueError(format!(
+                "Cannot destruct variable that can be either true or false",
+                
+            )))
+        }
+        _ => {
+            return Err(RuntimeError::ValueError(format!(
+                "Cannot || {} with something to get {}",
+                val, target_val
+            )))
+        }
+    }
+}
+
+pub fn eq_destruct(
+    val: &Value,
+    expr: &Expr,
+    target_val: &Value,
+    variables: &mut Variables,
+    functions: &Functions,
+) -> Result<(), RuntimeError> {
+    match target_val {
+        Value::Bool(true) => {
+            expr.destruct(val, variables, functions)?;
+            Ok(())
+        }
+        Value::Bool(false) => {
+            Err(RuntimeError::ValueError(format!(
+                "Cannot destruct variable that can be any value other than {}", val,
+            )))
+        }
+        _ => {
+            return Err(RuntimeError::ValueError(format!(
+                "Cannot == {} with something to get {}",
+                val, target_val
+            )))
+        }
+    }
 }

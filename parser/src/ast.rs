@@ -12,6 +12,11 @@ type Expression = Sp<Expr>;
 #[derive(Debug)]
 pub enum Transformation {
     Forced { destruct: Expr, construct: Expr },
+    Compound(Vec<Transformation>),
+    Try {
+        first: Box<Transformation>,
+        otherwise: Box<Transformation>,
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -77,6 +82,15 @@ pub enum Operator {
     Sub,
     Mul,
     Div,
+    And,
+    Or,
+
+    Eq,
+    Neq,
+    Lt,
+    Gt,
+    Le,
+    Ge,
 }
 
 #[derive(Debug)]
@@ -96,6 +110,6 @@ impl FromStr for TopLevel {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lexer = Lexer::new(s, None);
 
-        Ok(lexer.parse())
+        lexer.parse()
     }
 }

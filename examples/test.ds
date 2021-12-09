@@ -1,8 +1,5 @@
-main := 
-    _ -> [1, 2, 1, 2, 1, 2]
-    | tuplearr (a, b) -> (a, b);
+main := a -> if (a == "hello", 1, 0);
 
-num_from_str := a -> a::#string ~> #number;
-str_from_num := a -> a::#number ~> #string;
-
-tuplearr := (a, b) -> [a, b] * 3;
+if := 
+    ? (true, then, _) -> then 
+    : (false, _, else) -> else;
