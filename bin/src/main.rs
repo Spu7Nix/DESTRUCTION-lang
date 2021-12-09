@@ -64,7 +64,7 @@ fn main() {
         let mut cache = FileCache::default();
         match cache.fetch(&PathBuf::from(path)) {
             Ok(_) => (),
-            Err(_) => unreachable!()
+            Err(_) => unreachable!(),
         }
 
         let mut lexer = Lexer::new(&contents, PathBuf::from_str(path).ok());
@@ -74,7 +74,6 @@ fn main() {
                 eprintln!("{}", e);
                 return;
             }
-        
         };
 
         let evaled = match interpreter::interpret::interpret(

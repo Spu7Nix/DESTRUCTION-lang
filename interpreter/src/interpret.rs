@@ -402,8 +402,8 @@ impl Structure for Expr {
                     Ok(Some(Value::Number(*n)))
                 } else {
                     Err(RuntimeError::PatternMismatch(format!(
-                        "Expected number {:?}",
-                        n
+                        "Expected number {:?}, got {}",
+                        n, value
                     )))
                 }
             }
@@ -412,8 +412,8 @@ impl Structure for Expr {
                     Ok(Some(Value::Bool(*b)))
                 } else {
                     Err(RuntimeError::PatternMismatch(format!(
-                        "Expected bool {:?}",
-                        b
+                        "Expected bool {:?}, got {}",
+                        b, value
                     )))
                 }
             }
@@ -423,45 +423,49 @@ impl Structure for Expr {
                         Ok(Some(Value::String(s.to_owned())))
                     } else {
                         Err(RuntimeError::PatternMismatch(format!(
-                            "Expected string {:?}",
-                            s
+                            "Expected string {:?}, got {:?}",
+                            s, s2
                         )))
                     }
                 } else {
                     Err(RuntimeError::PatternMismatch(format!(
-                        "Expected string {:?}",
-                        s
+                        "Expected string {:?}, got {}",
+                        s, value
                     )))
                 }
             }
             Expr::Array(arr) => {
                 // i fugured out the destruct thing!!
-                if let Value::Array(arr2) = value {
-                    if arr.len() != arr2.len() {
-                        return Err(RuntimeError::PatternMismatch(format!(
-                            "Expected array of length {}",
-                            arr.len()
-                        )));
-                    }
-                    let mut arr_val = Some(Vec::new());
-
-                    for (e, v) in arr.iter().zip(arr2.iter()) {
-                        if let (Some(val), Some(arr_val)) =
-                            (e.destruct(v, variables, functions)?, &mut arr_val)
-                        {
-                            arr_val.push(val);
-                        } else {
-                            arr_val = None;
+                match value {
+                    Value::Array(arr2) => {
+                        if arr.len() != arr2.len() {
+                            return Err(RuntimeError::PatternMismatch(format!(
+                                "Expected array of length {}",
+                                arr.len()
+                            )));
                         }
-                    }
+                        let mut arr_val = Some(Vec::new());
 
-                    Ok(arr_val.map(Value::Array))
-                } else {
-                    Err(RuntimeError::PatternMismatch("Expected array".to_string()))
+                        for (e, v) in arr.iter().zip(arr2.iter()) {
+                            if let (Some(val), Some(arr_val)) =
+                                (e.destruct(v, variables, functions)?, &mut arr_val)
+                            {
+                                arr_val.push(val);
+                            } else {
+                                arr_val = None;
+                            }
+                        }
+
+                        Ok(arr_val.map(Value::Array))
+                    }
+                    a => Err(RuntimeError::PatternMismatch(format!(
+                        "Expected array, got {}",
+                        a
+                    ))),
                 }
             }
-            Expr::Tuple(t) => {
-                if let Value::Tuple(t2) = value {
+            Expr::Tuple(t) => match value {
+                Value::Tuple(t2) => {
                     if t.len() != t2.len() {
                         return Err(RuntimeError::PatternMismatch(format!(
                             "Expected tuple of length {}",
@@ -481,10 +485,12 @@ impl Structure for Expr {
                     }
 
                     Ok(arr_val.map(Value::Tuple))
-                } else {
-                    Err(RuntimeError::PatternMismatch("Expected tuple".to_string()))
                 }
-            }
+                a => Err(RuntimeError::PatternMismatch(format!(
+                    "Expected tuple, got {}",
+                    a
+                ))),
+            },
             Expr::Ident(i) => {
                 variables.insert(*i, value.clone())?;
                 Ok(None)
