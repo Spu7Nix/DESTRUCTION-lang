@@ -50,6 +50,11 @@ pub trait Maths {
     fn div(&self, other: &Self) -> Result<Value, RuntimeError>;
     fn and(&self, other: &Self) -> Result<Value, RuntimeError>;
     fn or(&self, other: &Self) -> Result<Value, RuntimeError>;
+
+    fn lt_op(&self, other: &Self) -> Result<Value, RuntimeError>;
+    fn gt_op(&self, other: &Self) -> Result<Value, RuntimeError>;
+    fn le_op(&self, other: &Self) -> Result<Value, RuntimeError>;
+    fn ge_op(&self, other: &Self) -> Result<Value, RuntimeError>;
 }
 
 #[derive(Debug)]

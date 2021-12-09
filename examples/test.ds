@@ -1,4 +1,4 @@
-main := a ;
+main := a -> if (a == "hello", 1, 0);
 
 if := 
     ? (true, then, _) -> then 

@@ -369,3 +369,29 @@ pub fn or_destruct(
         }
     }
 }
+
+pub fn eq_destruct(
+    val: &Value,
+    expr: &Expr,
+    target_val: &Value,
+    variables: &mut Variables,
+    functions: &Functions,
+) -> Result<(), RuntimeError> {
+    match target_val {
+        Value::Bool(true) => {
+            expr.destruct(val, variables, functions)?;
+            Ok(())
+        }
+        Value::Bool(false) => {
+            Err(RuntimeError::ValueError(format!(
+                "Cannot destruct variable that can be any value other than {}", val,
+            )))
+        }
+        _ => {
+            return Err(RuntimeError::ValueError(format!(
+                "Cannot == {} with something to get {}",
+                val, target_val
+            )))
+        }
+    }
+}

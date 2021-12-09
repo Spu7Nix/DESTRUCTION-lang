@@ -11,7 +11,18 @@ type Token = Sp<Tokens>;
 
 macro_rules! operator_pattern {
     () => {
-        Tokens::Star | Tokens::Minus | Tokens::Plus | Tokens::Fslash | Tokens::And | Tokens::Or
+        Tokens::Star 
+        | Tokens::Minus 
+        | Tokens::Plus 
+        | Tokens::Fslash 
+        | Tokens::And 
+        | Tokens::Or 
+        | Tokens::Eq
+        | Tokens::Neq
+        | Tokens::Lt
+        | Tokens::Le
+        | Tokens::Gt
+        | Tokens::Ge
     };
 }
 
@@ -474,6 +485,12 @@ impl From<Tokens> for Operator {
             Tokens::Fslash => Operator::Div,
             Tokens::And => Operator::And,
             Tokens::Or => Operator::Or,
+            Tokens::Eq => Operator::Eq,
+            Tokens::Neq => Operator::Neq,
+            Tokens::Lt => Operator::Lt,
+            Tokens::Gt => Operator::Gt,
+            Tokens::Le => Operator::Le,
+            Tokens::Ge => Operator::Ge,
             _ => panic!(),
         }
     }
@@ -501,6 +518,25 @@ pub enum Tokens {
 
     #[token("||")]
     Or,
+
+    #[token("==")]
+    Eq,
+
+    #[token("!=")]
+    Neq,
+
+    #[token("<")]
+    Lt,
+
+    #[token("<=")]
+
+    Le,
+
+    #[token(">")]
+    Gt,
+
+    #[token(">=")]
+    Ge,
 
     #[token("_")]
     Underscore,
@@ -555,24 +591,6 @@ pub enum Tokens {
 
     #[token("!")]
     Exclamation,
-
-    #[token("==")]
-    Equal,
-
-    #[token("!=")]
-    NotEqual,
-
-    #[token("<")]
-    LessThan,
-
-    #[token("<=")]
-    LessThanEqual,
-
-    #[token(">")]
-    GreaterThan,
-
-    #[token(">=")]
-    GreaterThanEqual,
 
     #[token(":=")]
     Define,

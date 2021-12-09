@@ -84,6 +84,13 @@ pub enum Operator {
     Div,
     And,
     Or,
+
+    Eq,
+    Neq,
+    Lt,
+    Gt,
+    Le,
+    Ge,
 }
 
 #[derive(Debug)]

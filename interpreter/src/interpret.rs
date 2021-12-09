@@ -107,6 +107,46 @@ impl Maths for Value {
             ))),
         }
     }
+
+    fn lt_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs < rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
+        }
+    }
+
+    fn gt_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs > rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
+        }
+    }
+
+    fn le_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs <= rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
+        }
+    }
+
+    fn ge_op(&self, other: &Self) -> Result<Value, RuntimeError> {
+        match (self, other) {
+            (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Bool(lhs >= rhs)),
+            (a, b) => Err(RuntimeError::ValueError(format!(
+                "Cannot compare {:?} and {:?}",
+                a, b
+            ))),
+        }
+    }
 }
 
 fn mul(
@@ -295,6 +335,22 @@ impl Structure for Expr {
                     Or => Ok(a
                         .construct(variables, functions)?
                         .or(&b.construct(variables, functions)?)?),
+
+                    Eq => Ok(Value::Bool(a.construct(variables, functions)? == b.construct(variables, functions)?)),
+                    Neq => Ok(Value::Bool(a.construct(variables, functions)? != b.construct(variables, functions)?)),
+                    Lt => Ok(a
+                        .construct(variables, functions)?
+                        .lt_op(&b.construct(variables, functions)?)?),
+                    Gt => Ok(a
+                        .construct(variables, functions)?
+                        .gt_op(&b.construct(variables, functions)?)?),
+                    Le => Ok(a
+                        .construct(variables, functions)?
+                        .le_op(&b.construct(variables, functions)?)?),
+                    Ge => Ok(a
+                        .construct(variables, functions)?
+                        .ge_op(&b.construct(variables, functions)?)?),
+
                 }
             }
             Expr::Cast(exp, to, from) => exp.construct(variables, functions)?.cast(to, from),
@@ -437,6 +493,12 @@ impl Structure for Expr {
                             Div => a.div(&b)?,
                             And => a.and(&b)?,
                             Or => a.or(&b)?,
+                            Eq => Value::Bool(a == b),
+                            Neq => Value::Bool(a != b),
+                            Lt => a.lt_op(&b)?,
+                            Gt => a.gt_op(&b)?,
+                            Le => a.le_op(&b)?,
+                            Ge => a.ge_op(&b)?,
                         };
                         if &res == value {
                             Ok(Some(res))
@@ -468,6 +530,13 @@ impl Structure for Expr {
                             Or => destruct_algebra::or_destruct(
                                 &left, &*right, value, variables, functions,
                             )?,
+                            Eq => destruct_algebra::eq_destruct(
+                                &left, &*right, value, variables, functions,
+                            )?,
+                            a => return Err(RuntimeError::PatternMismatch(format!(
+                                "This operator can not be destructed: {:?}",
+                                a
+                            ))),
                         };
                         Ok(None)
                     }
@@ -491,6 +560,13 @@ impl Structure for Expr {
                             Or => destruct_algebra::or_destruct(
                                 &right, &*left, value, variables, functions,
                             )?,
+                            Eq => destruct_algebra::eq_destruct(
+                                &right, &*left, value, variables, functions,
+                            )?,
+                            a => return Err(RuntimeError::PatternMismatch(format!(
+                                "This operator can not be destructed: {:?}",
+                                a
+                            ))),
                         };
                         Ok(None)
                     }
