@@ -597,43 +597,27 @@ impl Structure for Expr {
                         };
                         Ok(None)
                     }
-                    (Partial(partial_left), Partial(partial_right)) => {
-                        match (partial_left, op, partial_right) {
-                            (
-                                PartialValue::Array {
-                                    len: Some(len_a), ..
-                                },
-                                Add,
-                                PartialValue::Array {
-                                    len: Some(len_b), ..
-                                },
-                            ) => match value {
-                                Value::Array(arr) => {
-                                    if len_a + len_b != arr.len() {
-                                        return Err(RuntimeError::PatternMismatch(format!(
-                                        "Cannot add arrays of length {} and {} to get an array of length {}",
-                                        len_a, len_b, arr.len()
-                                    )));
-                                    }
-                                    let target_val1 = Value::Array(arr[..len_a].to_vec());
-                                    let target_val2 = Value::Array(arr[len_a..].to_vec());
-                                    left.destruct(&target_val1, variables, functions)?;
-                                    right.destruct(&target_val2, variables, functions)?;
-                                    Ok(None)
-                                }
-                                a => {
-                                    return Err(RuntimeError::PatternMismatch(format!(
-                                        "Cannot add two arrays to get {}",
-                                        a
-                                    )))
-                                }
+                    (Partial(partial_left), _) => match (partial_left, op) {
+                        (
+                            PartialValue::Array {
+                                len: Some(len_a), ..
                             },
-                            _ => Err(RuntimeError::ValueError(
-                                "Cannot destruct expression with two unknowns".to_string(),
-                            )),
-                        }
-                    }
-                    (Partial(partial_left), Unknown) => match (partial_left, op) {
+                            Add,
+                        ) => match value {
+                            Value::Array(arr) => {
+                                let target_val1 = Value::Array(arr[..len_a].to_vec());
+                                let target_val2 = Value::Array(arr[len_a..].to_vec());
+                                left.destruct(&target_val1, variables, functions)?;
+                                right.destruct(&target_val2, variables, functions)?;
+                                Ok(None)
+                            }
+                            a => {
+                                return Err(RuntimeError::PatternMismatch(format!(
+                                    "Cannot add two arrays to get {}",
+                                    a
+                                )))
+                            }
+                        },
                         (
                             PartialValue::Array {
                                 len: Some(len_a), ..
@@ -643,9 +627,9 @@ impl Structure for Expr {
                             Value::Array(arr) => {
                                 if arr.len() % len_a != 0 {
                                     return Err(RuntimeError::PatternMismatch(format!(
-                                        "Cannot multiply array of length {} by anything to get an array of length {}",
-                                        len_a, arr.len(),
-                                    )));
+                                            "Cannot multiply array of length {} by anything to get an array of length {}",
+                                            len_a, arr.len(),
+                                        )));
                                 }
                                 let num = Value::Number((arr.len() / len_a) as f64);
                                 right.destruct(&num, variables, functions)?;
@@ -665,6 +649,35 @@ impl Structure for Expr {
                             "Cannot destruct expression with two unknowns".to_string(),
                         )),
                     },
+
+                    (_, Partial(partial_right)) => match (partial_right, op) {
+                        (
+                            PartialValue::Array {
+                                len: Some(len_b), ..
+                            },
+                            Add,
+                        ) => match value {
+                            Value::Array(arr) => {
+                                let len = arr.len() - len_b;
+                                let target_val1 = Value::Array(arr[..len].to_vec());
+                                let target_val2 = Value::Array(arr[len..].to_vec());
+                                left.destruct(&target_val1, variables, functions)?;
+                                right.destruct(&target_val2, variables, functions)?;
+                                Ok(None)
+                            }
+                            a => {
+                                return Err(RuntimeError::PatternMismatch(format!(
+                                    "Cannot add two arrays to get {}",
+                                    a
+                                )))
+                            }
+                        },
+
+                        _ => Err(RuntimeError::ValueError(
+                            "Cannot destruct expression with two unknowns".to_string(),
+                        )),
+                    },
+
                     _ => Err(RuntimeError::ValueError(
                         "Cannot destruct expression with two unknowns".to_string(),
                     )),

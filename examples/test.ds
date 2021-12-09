@@ -1,6 +1,9 @@
-main := 
-    _ -> [1, 1, 3]
-    | [a, b] + [c] -> (a, b, c);
+main := _ -> max [3, 4, 18, 0, 28];
 
+max :=
+    ? [el] -> el 
+    : [first] + a -> if (first > max a, first, max a);
 
-add := (a, b) -> a + b;
+if := 
+    ? (true, then, _) -> then 
+    : (false, _, else) -> else;

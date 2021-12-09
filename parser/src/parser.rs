@@ -11,18 +11,18 @@ type Token = Sp<Tokens>;
 
 macro_rules! operator_pattern {
     () => {
-        Tokens::Star 
-        | Tokens::Minus 
-        | Tokens::Plus 
-        | Tokens::Fslash 
-        | Tokens::And 
-        | Tokens::Or 
-        | Tokens::Eq
-        | Tokens::Neq
-        | Tokens::Lt
-        | Tokens::Le
-        | Tokens::Gt
-        | Tokens::Ge
+        Tokens::Star
+            | Tokens::Minus
+            | Tokens::Plus
+            | Tokens::Fslash
+            | Tokens::And
+            | Tokens::Or
+            | Tokens::Eq
+            | Tokens::Neq
+            | Tokens::Lt
+            | Tokens::Le
+            | Tokens::Gt
+            | Tokens::Ge
     };
 }
 
@@ -73,7 +73,6 @@ impl<'a> Lexer<'a> {
             Some(t) => Ok(t),
             None => Err(self.err(LangErrorT::SyntaxError, "Unexpected end of input")),
         }
-            
     }
 
     pub fn parse(&mut self) -> Result<TopLevel, LangError> {
@@ -103,10 +102,12 @@ impl<'a> Lexer<'a> {
                     Some(Token {
                         data: Tokens::Pipe, ..
                     }) => (),
-                    a => return Err(self.err(
-                        LangErrorT::SyntaxError,
-                        &format!("Expected ';' or '|', found {:?}", a),
-                    )),
+                    a => {
+                        return Err(self.err(
+                            LangErrorT::SyntaxError,
+                            &format!("Expected ';' or '|', found {:?}", a),
+                        ))
+                    }
                 }
             }
             functions.insert(name, transformations);
@@ -123,19 +124,22 @@ impl<'a> Lexer<'a> {
                 Ok(Expr::Operator(op.into(), lhs, rhs))
             }
 
-            t => {
-                Err(self.err(LangErrorT::SyntaxError, &format!("Expected operator, found {:?}", t)))
-            }
+            t => Err(self.err(
+                LangErrorT::SyntaxError,
+                &format!("Expected operator, found {:?}", t),
+            )),
         }
     }
 
     fn expect(&mut self, token: Tokens) -> Result<(), LangError> {
         match self.peek() {
             Some(Token { data: t, .. }) if t == token => self.next_token(),
-            Some(Token { data: t, .. }) => return Err(self.err(
-                LangErrorT::SyntaxError,
-                &format!("Expected {:?}, found {:?}", token, t),
-            )),
+            Some(Token { data: t, .. }) => {
+                return Err(self.err(
+                    LangErrorT::SyntaxError,
+                    &format!("Expected {:?}, found {:?}", token, t),
+                ))
+            }
             None => return Err(self.err(LangErrorT::SyntaxError, &format!("Expected {:?}", token))),
         };
         Ok(())
@@ -180,7 +184,6 @@ impl<'a> Lexer<'a> {
                     self.next_token();
                     Expr::Array(Vec::new())
                 } else {
-
                     let mut exprs = Vec::new();
                     loop {
                         exprs.push(self.parse_expr()?);
@@ -188,10 +191,12 @@ impl<'a> Lexer<'a> {
                             Tokens::Comma => (),
                             Tokens::Rbracket => break,
 
-                            token => return Err(self.err(
-                                LangErrorT::SyntaxError,
-                                &format!("Expected tokens `]` or `,`, found {:?}", token),
-                            )),
+                            token => {
+                                return Err(self.err(
+                                    LangErrorT::SyntaxError,
+                                    &format!("Expected tokens `]` or `,`, found {:?}", token),
+                                ))
+                            }
                         }
                     }
                     Expr::Array(exprs)
@@ -209,7 +214,9 @@ impl<'a> Lexer<'a> {
                         | Tokens::Pipe
                         | Tokens::Rbrace
                         | Tokens::Rarrow
-                        | Tokens::DoubleColon,
+                        | Tokens::DoubleColon
+                        | Tokens::Colon
+                        | Tokens::Question,
                     ..
                 }) => Expr::Ident(s),
                 _ => Expr::Call(s, self.parse_expr()?.into()),
@@ -242,20 +249,24 @@ impl<'a> Lexer<'a> {
                             Tokens::Comma => (),
                             Tokens::Rparen => break,
 
-                            token => return Err(self.err(
-                                LangErrorT::SyntaxError,
-                                &format!("Expected tokens `)` or `,`, found {:?}", token),
-                            )),
+                            token => {
+                                return Err(self.err(
+                                    LangErrorT::SyntaxError,
+                                    &format!("Expected tokens `)` or `,`, found {:?}", token),
+                                ))
+                            }
                         }
                     }
                     Expr::Tuple(exprs)
                 }
             }
 
-            token => return Err(self.err(
-                LangErrorT::SyntaxError,
-                &format!("Unexpected token: {:?}", token),
-            )),
+            token => {
+                return Err(self.err(
+                    LangErrorT::SyntaxError,
+                    &format!("Unexpected token: {:?}", token),
+                ))
+            }
         };
 
         let first = if let Some(uo) = unary_operator {
@@ -287,19 +298,17 @@ impl<'a> Lexer<'a> {
                         s2.remove(0);
                         match s2.parse::<Type>() {
                             Err(e) => {
-                                return Err(self.err(
-                                    e,
-                                    &format!("{:?} is not a valid type", s),
-                                ))
+                                return Err(self.err(e, &format!("{:?} is not a valid type", s)))
                             }
                             Ok(t) => t,
                         }
-                        
                     }
-                    token => return Err(self.err(
-                        LangErrorT::SyntaxError,
-                        &format!("Expected type, found {:?}", token),
-                    )),
+                    token => {
+                        return Err(self.err(
+                            LangErrorT::SyntaxError,
+                            &format!("Expected type, found {:?}", token),
+                        ))
+                    }
                 };
 
                 self.expect(Tokens::WavyArrow)?;
@@ -310,18 +319,17 @@ impl<'a> Lexer<'a> {
                         s2.remove(0);
                         match s2.parse::<Type>() {
                             Err(e) => {
-                                return Err(self.err(
-                                    e,
-                                    &format!("{:?} is not a valid type", s),
-                                ))
+                                return Err(self.err(e, &format!("{:?} is not a valid type", s)))
                             }
                             Ok(t) => t,
                         }
                     }
-                    token => return Err(self.err(
-                        LangErrorT::SyntaxError,
-                        &format!("Expected type, found {:?}", token),
-                    )),
+                    token => {
+                        return Err(self.err(
+                            LangErrorT::SyntaxError,
+                            &format!("Expected type, found {:?}", token),
+                        ))
+                    }
                 };
 
                 Ok(Expr::Cast(box first, to, from))
@@ -344,10 +352,12 @@ impl<'a> Lexer<'a> {
                         Tokens::Pipe => (),
                         Tokens::Rbrace => break,
 
-                        token => return Err(self.err(
-                            LangErrorT::SyntaxError,
-                            &format!("Expected tokens `}}` or `|`, found {:?}", token),
-                        )),
+                        token => {
+                            return Err(self.err(
+                                LangErrorT::SyntaxError,
+                                &format!("Expected tokens `}}` or `|`, found {:?}", token),
+                            ))
+                        }
                     }
                 }
                 Ok(Transformation::Compound(transforms))
@@ -362,7 +372,7 @@ impl<'a> Lexer<'a> {
                 let first = box self.parse_transform()?;
                 self.expect(Tokens::Colon)?;
                 let otherwise = box self.parse_transform()?;
-                Ok(Transformation::Try{ first, otherwise })
+                Ok(Transformation::Try { first, otherwise })
             }
 
             _ => {
@@ -375,7 +385,6 @@ impl<'a> Lexer<'a> {
                 })
             }
         }
-        
     }
 
     pub fn peek(&self) -> Option<Token> {
@@ -529,7 +538,6 @@ pub enum Tokens {
     Lt,
 
     #[token("<=")]
-
     Le,
 
     #[token(">")]
@@ -596,18 +604,6 @@ pub enum Tokens {
     Define,
 
     // Keywords and literals
-    #[token("let")]
-    Let,
-
-    #[token("if")]
-    If,
-
-    #[token("then")]
-    Then,
-
-    #[token("else")]
-    Else,
-
     #[token("true")]
     True,
 
