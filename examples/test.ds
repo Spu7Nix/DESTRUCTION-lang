@@ -1,5 +1,6 @@
-main := a -> if (a == "hello", 1, 0);
+main := 
+    _ -> [1, 1, 3]
+    | [a, b] + [c] -> (a, b, c);
 
-if := 
-    ? (true, then, _) -> then 
-    : (false, _, else) -> else;
+
+add := (a, b) -> a + b;

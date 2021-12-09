@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use parser::ast::{Type, UnaryOperator, Transformation};
+use parser::ast::{Transformation, Type, UnaryOperator};
 use parser::internment::LocalIntern;
 
 use crate::error::RuntimeError;
-use crate::traits::{Functions, Maths, Structure, Value, Variables};
+use crate::traits::{DestructResult, Functions, Maths, PartialValue, Structure, Value, Variables};
 use parser::ast::Transformation::Forced;
 use parser::ast::{Expr, TopLevel};
 
@@ -199,14 +199,22 @@ fn run_func(
     run_tranforms(transforms, value, functions)
 }
 
-fn run_tranforms(transforms: &[Transformation], mut value: Value, functions: &HashMap<LocalIntern<String>, Vec<parser::ast::Transformation>>) -> Result<Value, RuntimeError> {
+fn run_tranforms(
+    transforms: &[Transformation],
+    mut value: Value,
+    functions: &HashMap<LocalIntern<String>, Vec<parser::ast::Transformation>>,
+) -> Result<Value, RuntimeError> {
     for trans in transforms {
         value = run_single_transform(trans, value, functions)?
     }
     Ok(value)
 }
 
-fn run_single_transform(trans: &Transformation, value: Value, functions: &HashMap<LocalIntern<String>, Vec<Transformation>>) -> Result<Value, RuntimeError> {
+fn run_single_transform(
+    trans: &Transformation,
+    value: Value,
+    functions: &HashMap<LocalIntern<String>, Vec<Transformation>>,
+) -> Result<Value, RuntimeError> {
     Ok(match trans {
         Forced {
             destruct,
@@ -247,14 +255,22 @@ fn reverse_run_func(
     reverse_run_transforms(transforms, output, functions)
 }
 
-fn reverse_run_transforms(transforms: &[Transformation], mut output: Value, functions: &Functions) -> Result<Value, RuntimeError> {
+fn reverse_run_transforms(
+    transforms: &[Transformation],
+    mut output: Value,
+    functions: &Functions,
+) -> Result<Value, RuntimeError> {
     for trans in transforms.iter().rev() {
         output = reverse_run_singe_tranform(trans, output, functions)?
     }
     Ok(output)
 }
 
-fn reverse_run_singe_tranform(trans: &Transformation, output: Value, functions: &HashMap<LocalIntern<String>, Vec<Transformation>>) -> Result<Value, RuntimeError> {
+fn reverse_run_singe_tranform(
+    trans: &Transformation,
+    output: Value,
+    functions: &HashMap<LocalIntern<String>, Vec<Transformation>>,
+) -> Result<Value, RuntimeError> {
     Ok(match trans {
         Forced {
             destruct,
@@ -280,7 +296,7 @@ fn reverse_run_singe_tranform(trans: &Transformation, output: Value, functions: 
                 Ok(v) => v,
                 Err(_) => reverse_run_singe_tranform(otherwise, output, functions)?,
             }
-        },
+        }
     })
 }
 
@@ -336,8 +352,12 @@ impl Structure for Expr {
                         .construct(variables, functions)?
                         .or(&b.construct(variables, functions)?)?),
 
-                    Eq => Ok(Value::Bool(a.construct(variables, functions)? == b.construct(variables, functions)?)),
-                    Neq => Ok(Value::Bool(a.construct(variables, functions)? != b.construct(variables, functions)?)),
+                    Eq => Ok(Value::Bool(
+                        a.construct(variables, functions)? == b.construct(variables, functions)?,
+                    )),
+                    Neq => Ok(Value::Bool(
+                        a.construct(variables, functions)? != b.construct(variables, functions)?,
+                    )),
                     Lt => Ok(a
                         .construct(variables, functions)?
                         .lt_op(&b.construct(variables, functions)?)?),
@@ -350,7 +370,6 @@ impl Structure for Expr {
                     Ge => Ok(a
                         .construct(variables, functions)?
                         .ge_op(&b.construct(variables, functions)?)?),
-
                 }
             }
             Expr::Cast(exp, to, from) => exp.construct(variables, functions)?.cast(to, from),
@@ -477,11 +496,15 @@ impl Structure for Expr {
 
             Expr::Operator(op, left, right) => {
                 use parser::ast::Operator::*;
+                use DestructResult::*;
                 match (
-                    left.construct(&mut Variables::new(), functions),
-                    right.construct(&mut Variables::new(), functions),
+                    left.destruct_to_value(functions)?,
+                    right.destruct_to_value(functions)?,
                 ) {
-                    (Ok(a), Ok(b)) => {
+                    (
+                        Known(a) | Partial(PartialValue::Value(a)),
+                        Known(b) | Partial(PartialValue::Value(b)),
+                    ) => {
                         // incase some patterns both destruct and give a value (like @ in rust)
                         left.destruct(&a, variables, functions)?;
                         right.destruct(&b, variables, functions)?;
@@ -510,7 +533,7 @@ impl Structure for Expr {
                         }
                     }
 
-                    (Ok(left), Err(_)) => {
+                    (Known(left) | Partial(PartialValue::Value(left)), Unknown) => {
                         match op {
                             Add => destruct_algebra::add_left_destruct(
                                 &left, &*right, value, variables, functions,
@@ -533,14 +556,16 @@ impl Structure for Expr {
                             Eq => destruct_algebra::eq_destruct(
                                 &left, &*right, value, variables, functions,
                             )?,
-                            a => return Err(RuntimeError::PatternMismatch(format!(
-                                "This operator can not be destructed: {:?}",
-                                a
-                            ))),
+                            a => {
+                                return Err(RuntimeError::PatternMismatch(format!(
+                                    "This operator can not be destructed: {:?}",
+                                    a
+                                )))
+                            }
                         };
                         Ok(None)
                     }
-                    (Err(_), Ok(right)) => {
+                    (Unknown, Known(right) | Partial(PartialValue::Value(right))) => {
                         match op {
                             Add => destruct_algebra::add_right_destruct(
                                 &right, &*left, value, variables, functions,
@@ -563,14 +588,83 @@ impl Structure for Expr {
                             Eq => destruct_algebra::eq_destruct(
                                 &right, &*left, value, variables, functions,
                             )?,
-                            a => return Err(RuntimeError::PatternMismatch(format!(
-                                "This operator can not be destructed: {:?}",
-                                a
-                            ))),
+                            a => {
+                                return Err(RuntimeError::PatternMismatch(format!(
+                                    "This operator can not be destructed: {:?}",
+                                    a
+                                )))
+                            }
                         };
                         Ok(None)
                     }
-
+                    (Partial(partial_left), Partial(partial_right)) => {
+                        match (partial_left, op, partial_right) {
+                            (
+                                PartialValue::Array {
+                                    len: Some(len_a), ..
+                                },
+                                Add,
+                                PartialValue::Array {
+                                    len: Some(len_b), ..
+                                },
+                            ) => match value {
+                                Value::Array(arr) => {
+                                    if len_a + len_b != arr.len() {
+                                        return Err(RuntimeError::PatternMismatch(format!(
+                                        "Cannot add arrays of length {} and {} to get an array of length {}",
+                                        len_a, len_b, arr.len()
+                                    )));
+                                    }
+                                    let target_val1 = Value::Array(arr[..len_a].to_vec());
+                                    let target_val2 = Value::Array(arr[len_a..].to_vec());
+                                    left.destruct(&target_val1, variables, functions)?;
+                                    right.destruct(&target_val2, variables, functions)?;
+                                    Ok(None)
+                                }
+                                a => {
+                                    return Err(RuntimeError::PatternMismatch(format!(
+                                        "Cannot add two arrays to get {}",
+                                        a
+                                    )))
+                                }
+                            },
+                            _ => Err(RuntimeError::ValueError(
+                                "Cannot destruct expression with two unknowns".to_string(),
+                            )),
+                        }
+                    }
+                    (Partial(partial_left), Unknown) => match (partial_left, op) {
+                        (
+                            PartialValue::Array {
+                                len: Some(len_a), ..
+                            },
+                            Mul,
+                        ) => match value {
+                            Value::Array(arr) => {
+                                if arr.len() % len_a != 0 {
+                                    return Err(RuntimeError::PatternMismatch(format!(
+                                        "Cannot multiply array of length {} by anything to get an array of length {}",
+                                        len_a, arr.len(),
+                                    )));
+                                }
+                                let num = Value::Number((arr.len() / len_a) as f64);
+                                right.destruct(&num, variables, functions)?;
+                                destruct_algebra::mul_right_destruct(
+                                    &num, &*left, value, variables, functions,
+                                )?;
+                                Ok(None)
+                            }
+                            a => {
+                                return Err(RuntimeError::PatternMismatch(format!(
+                                    "Cannot multiply array to get {}",
+                                    a
+                                )))
+                            }
+                        },
+                        _ => Err(RuntimeError::ValueError(
+                            "Cannot destruct expression with two unknowns".to_string(),
+                        )),
+                    },
                     _ => Err(RuntimeError::ValueError(
                         "Cannot destruct expression with two unknowns".to_string(),
                     )),
@@ -593,10 +687,142 @@ impl Structure for Expr {
                 val.destruct(&target_value, variables, functions)
             }
             Expr::Any => Ok(None),
-            Expr::Call(f, a) => {
-                let target_val = reverse_run_func(*f, value.clone(), functions)?;
-                a.destruct(&target_val, variables, functions)
+            Expr::Call(f, a) => match a.destruct_to_value(functions)? {
+                DestructResult::Known(v) => Ok(Some(run_func(*f, v, functions)?)),
+                _ => {
+                    let target_val = reverse_run_func(*f, value.clone(), functions)?;
+                    a.destruct(&target_val, variables, functions)
+                }
+            },
+        }
+    }
+
+    fn destruct_to_value(&self, functions: &Functions) -> Result<DestructResult, RuntimeError> {
+        use DestructResult::*;
+        match &self {
+            Expr::Number(n) => Ok(Known(Value::Number(*n))),
+            Expr::Bool(b) => Ok(Known(Value::Bool(*b))),
+            Expr::String(s, _) => Ok(Known(Value::String(s.clone()))),
+            Expr::Array(arr) => {
+                let mut arr_val = Vec::new();
+                let mut known = true;
+                for e in arr {
+                    let val = e.destruct_to_value(functions)?;
+                    if let Unknown = val {
+                        known = false;
+                    }
+                    arr_val.push(val);
+                }
+                if known {
+                    Ok(Known(Value::Array(
+                        arr_val.into_iter().map(|v| v.unwrap()).collect(),
+                    )))
+                } else {
+                    Ok(Partial(PartialValue::Array {
+                        len: Some(arr_val.len()),
+                        known_elems: arr_val
+                            .into_iter()
+                            .enumerate()
+                            .filter_map(|(a, b)| match b {
+                                Known(v) => Some((a, PartialValue::Value(v))),
+                                Partial(v) => Some((a, v)),
+                                _ => None,
+                            })
+                            .collect(),
+                    }))
+                }
             }
+            Expr::Tuple(t) => {
+                let mut arr_val = Vec::new();
+                let mut known = true;
+                for e in t {
+                    let val = e.destruct_to_value(functions)?;
+                    if let Unknown = val {
+                        known = false;
+                        break;
+                    }
+                    arr_val.push(val);
+                }
+                if known {
+                    Ok(Known(Value::Array(
+                        arr_val.into_iter().map(|v| v.unwrap()).collect(),
+                    )))
+                } else {
+                    Ok(Unknown)
+                }
+            }
+            Expr::Ident(i) => Ok(Unknown),
+            Expr::PolyIdent(i) => Ok(Unknown),
+
+            Expr::Operator(op, left, right) => {
+                use parser::ast::Operator::*;
+                match (
+                    left.destruct_to_value(functions)?,
+                    right.destruct_to_value(functions)?,
+                ) {
+                    (Known(a), Known(b)) => {
+                        // incase some patterns both destruct and give a value (like @ in rust)
+                        let res = match op {
+                            Add => a.add(&b)?,
+                            Sub => a.sub(&b)?,
+                            Mul => match (a, b) {
+                                (Value::Number(a), Value::Number(b)) => Value::Number(a * b),
+                                (Value::String(a), Value::Number(b)) => {
+                                    Value::String(a.repeat(b as usize))
+                                } // ensure b is int?
+                                (Value::Array(a), Value::Number(b)) => Value::Array(
+                                    a.iter()
+                                        .cloned()
+                                        .cycle()
+                                        .take(b as usize * a.len())
+                                        .collect(),
+                                ),
+                                (a, b) => {
+                                    return Err(RuntimeError::ValueError(format!(
+                                        "Cannot multiply {} and {}",
+                                        a, b
+                                    )))
+                                }
+                            },
+                            Div => a.div(&b)?,
+                            And => a.and(&b)?,
+                            Or => a.or(&b)?,
+                            Eq => Value::Bool(a == b),
+                            Neq => Value::Bool(a != b),
+                            Lt => a.lt_op(&b)?,
+                            Gt => a.gt_op(&b)?,
+                            Le => a.le_op(&b)?,
+                            Ge => a.ge_op(&b)?,
+                        };
+
+                        Ok(Known(res))
+                    }
+
+                    _ => Ok(Unknown),
+                }
+            }
+            Expr::Cast(exp, to, from) => match exp.destruct_to_value(functions)? {
+                Known(v) => Ok(Known(v.cast(from, to)?)),
+                _ => Ok(Unknown),
+            },
+            Expr::UnaryOp(op, val) => {
+                match (op, val.destruct_to_value(functions)?) {
+                    // -x = n
+                    (UnaryOperator::Neg, Known(Value::Number(n))) => Ok(Known(Value::Number(-n))),
+                    // !x = b
+                    (UnaryOperator::Not, Known(Value::Bool(b))) => Ok(Known(Value::Bool(!b))),
+                    (op, Known(v)) => Err(RuntimeError::ValueError(format!(
+                        "Cannot apply unary operator {:?} to {}",
+                        op, v
+                    ))),
+                    _ => Ok(Unknown),
+                }
+            }
+            Expr::Any => Ok(Unknown),
+            Expr::Call(f, a) => match a.destruct_to_value(functions)? {
+                Known(v) => Ok(Known(run_func(*f, v, functions)?)), // run function normally because the value is known
+                _ => Ok(Unknown),
+            }, // ??
         }
     }
 }

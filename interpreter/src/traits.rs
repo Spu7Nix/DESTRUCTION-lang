@@ -43,7 +43,6 @@ impl Display for Value {
     }
 }
 
-
 pub trait Maths {
     fn add(&self, other: &Self) -> Result<Value, RuntimeError>;
     fn sub(&self, other: &Self) -> Result<Value, RuntimeError>;
@@ -65,12 +64,54 @@ pub struct Variables {
 
 pub type Functions = HashMap<LocalIntern<String>, Vec<Transformation>>;
 
+pub enum DestructResult {
+    Known(Value),
+    Partial(PartialValue),
+    Unknown,
+}
+
+pub enum PartialValue {
+    Array {
+        len: Option<usize>,
+        known_elems: HashMap<usize, PartialValue>,
+    },
+    Value(Value),
+}
+
+impl PartialValue {
+    pub fn to_value(&self) -> Result<Value, RuntimeError> {
+        match self {
+            PartialValue::Array { len, known_elems } => {
+                let len = len.ok_or(RuntimeError::ValueError(
+                    "Array length is not known".to_string(),
+                ))?;
+                let mut vals = Vec::with_capacity(len);
+                for i in 0..len {
+                    if let Some(val) = known_elems.get(&i) {
+                        vals.push(val.to_value()?);
+                    } else {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Array element {} is not known",
+                            i
+                        )));
+                    }
+                }
+                Ok(Value::Array(vals))
+            }
+            PartialValue::Value(v) => Ok(v.clone()),
+        }
+    }
+}
+
 pub trait Structure {
     fn construct(
         &self,
         variables: &mut Variables,
         functions: &Functions,
     ) -> Result<Value, RuntimeError>;
+
+    fn destruct_to_value(&self, functions: &Functions) -> Result<DestructResult, RuntimeError>;
+
     fn destruct(
         &self,
         value: &Value,
@@ -141,5 +182,14 @@ impl Variables {
 impl Default for Variables {
     fn default() -> Self {
         Self::new()
+    }
+}
+impl DestructResult {
+    pub fn unwrap(self) -> Value {
+        if let DestructResult::Known(v) = self {
+            v
+        } else {
+            panic!("DestructResult is not known")
+        }
     }
 }
