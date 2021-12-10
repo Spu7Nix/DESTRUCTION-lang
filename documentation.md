@@ -59,6 +59,22 @@ In DESTRUCTION, you can also use the operators `+` and `*` on strings and arrays
 
 > To understand this better, you can imagine how the transformation would not change the value if the right side was the same expression as the left, for example `n * 10 -> n * 10` would first extract `n` as 6, and then construct it back to 60 on the right side
 
+This is especially useful for operations that mean the opposite of eachother. For example, in DESTRUCTION, you can split a string with a separator with `/`, like this:
+
+```js
+// input is "hello world!"
+a -> a / " "
+// output is ["hello", "world!"]
+```
+
+By using this feature in the destructuring pattern, you can get a `string.join` feature for free!
+
+```
+// input is ["hello", "world!"]
+a / " " -> a
+// output is "hello world!"
+```
+
 ## Conditional transformations
 
 A _conditional transformation_ consists of two sub-transformations. It will first try to transform the current value using the first transformation, but if the value doesn't fit the first transformation's destructuring pattern, it will run the other transformation instead.
