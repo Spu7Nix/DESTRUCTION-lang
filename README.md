@@ -34,7 +34,8 @@ Happy DESTRUCTION-ing!
 
 Basic hello world: `cargo run build examples/greet.ds --input world`
 Fibonacci: `cargo run build examples/fibonacci.ds --input 10` (the input is the number of fibonacci numbers to output)
-Sorting: `cargo run build examples/sort.ds`
+Sorting: `cargo run build examples/sort.ds --input "5, 3, 1, 4, 2, 100, -10, 3.14"` (the input is a comma-separated list of numbers to sort)
+Factorial: `cargo run build examples/factorial.ds --input 7` (the input the number to calculate the factorial of)
 
 ### CLI docs
 

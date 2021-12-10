@@ -3,6 +3,16 @@
 version = 3
 
 [[package]]
+name = "DESTRUCTION"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "clap",
+ "interpreter",
+ "parser",
+]
+
+[[package]]
 name = "ahash"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -42,16 +52,6 @@ name = "beef"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bed554bd50246729a1ec158d08aa3235d1b69d94ad120ebe187e28894787e736"
-
-[[package]]
-name = "bin"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "clap",
- "interpreter",
- "parser",
-]
 
 [[package]]
 name = "bitflags"
