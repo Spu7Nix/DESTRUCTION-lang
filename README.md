@@ -2,7 +2,7 @@
 
 Documentation:
 
-- [Language](language_documentation.md)
+- [Language](documentation.md)
 - [CLI](#usage-and-cli)
 
 ## Practical info
@@ -10,6 +10,27 @@ Documentation:
 ...
 
 ## Usage and CLI
+
+### Installation
+
+Notes: You must have rust installed from the official [rust-lang](https://www.rust-lang.org/tools/install) site; There are installation steps on the site.
+
+- Clone the github repository:  
+
+```sh
+$ git clone https://github.com/Spu7Nix/langjam2.git
+Cloned https://github.com/Spu7Nix/langjam2.git into langjam2
+```
+
+- `cd` into `./langjam2` and run the following:
+
+```sh
+cargo run -- [command goes here] # Commands are documented below
+```
+
+Happy DESTRUCTION-ing!
+
+### CLI docs
 
 ```sh
 # Subcommands
