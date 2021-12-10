@@ -1,0 +1,5 @@
+main := a::#number~>#string -> fib ([0, 1], a);
+
+fib := 
+    ? (a, 0) -> a
+    : (first + [a, b], d) -> fib (first + [a, b, a + b], d - 1);

@@ -647,6 +647,6 @@ pub enum Tokens {
     Newline,
 
     #[error]
-    #[regex(r"[ \t\f\r]+", logos::skip)]
+    #[regex(r"[ \t\f\r]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     Error,
 }

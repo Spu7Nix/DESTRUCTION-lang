@@ -1,7 +1,0 @@
-main :=  _ -> join (["hello", "how", "are", "you"], " ");
-
-join := ([*a] * n, sep) -> (((*a + sep) * (n - 1)) + *a, sep);
-
-split :=
-    (arr, sep) -> (sep, arr)
-    | (sep, ((*a + sep) * (n - 1)) + *a) -> [*a] * n

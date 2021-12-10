@@ -1,4 +1,0 @@
-add_nums := (a, b) -> a + b;
-main := 
-    _ -> 10
-    | add_nums (a, b) -> a;

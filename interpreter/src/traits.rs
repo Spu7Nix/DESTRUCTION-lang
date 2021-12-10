@@ -7,7 +7,7 @@ use parser::{
 
 use crate::error::RuntimeError;
 
-#[derive(Clone, PartialEq, Debug)] // vec isnt Copy ye ik i just had oto chek chek
+#[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Number(f64),
     String(String),

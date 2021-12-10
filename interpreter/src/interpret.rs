@@ -4,9 +4,7 @@ use parser::ast::{Transformation, Type, UnaryOperator};
 use parser::internment::LocalIntern;
 
 use crate::error::RuntimeError;
-use crate::traits::{
-    DestructResult, Functions, Maths, PartialStringPart, PartialValue, Structure, Value, Variables,
-};
+use crate::traits::{DestructResult, Functions, Maths, PartialValue, Structure, Value, Variables};
 use parser::ast::Transformation::Forced;
 use parser::ast::{Expr, TopLevel};
 
