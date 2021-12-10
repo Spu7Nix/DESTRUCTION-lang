@@ -170,6 +170,24 @@ fn mul(
             ))
         }
     };
+    if factor == 0.0 {
+        return match left.destruct_to_value(functions, variables)? {
+            DestructResult::Known(a) | DestructResult::Partial(PartialValue::Value(a)) => match a {
+                Value::Number(_) => Ok(Value::Number(0.0)),
+                Value::String(_) => Ok(Value::String("".to_string())),
+                Value::Array(_) => Ok(Value::Array(vec![])),
+                a => Err(RuntimeError::ValueError(format!(
+                    "Cannot multiply {:?} by 0",
+                    a
+                ))),
+            },
+            DestructResult::Partial(PartialValue::Array { .. }) => Ok(Value::Array(vec![])),
+            DestructResult::Unknown => Err(RuntimeError::ValueError(
+                "Cannot unknown value by zero".to_string(),
+            )),
+        };
+    }
+
     let mut out = left.construct(variables, functions)?;
     if let Value::Number(n) = out {
         return Ok(Value::Number(n * factor));
