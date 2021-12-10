@@ -1,25 +1,4 @@
-main := _ -> sort [1, 5, 129, 20, 10, 2, -10, 0, 1, 5];
-
-sort := 
-    ?  [el] -> [el]
-    :? [a, b] -> if (a > b, [b, a], [a, b]) 
-    : {
-        a -> max_and_rest a
-        | (m, rest) -> (sort rest) + [m]
-    };
-
-max_and_rest :=
-    ? [el] -> (el, []) 
-    : {
-        [first] + a -> if (first > max a, (first, a), (max_and_rest a, first))
-        |? ((max, rest), first) -> (max, rest + [first])
-        :  a -> a
-    };
-
-max :=
-    ? [el] -> el 
-    : [first] + a -> if (first > max a, first, max a);
-
-if := 
-    ? (true, then, _) -> then 
-    : (false, _, else) -> else;
+add_nums := (a, b) -> a + b;
+main := 
+    _ -> 10
+    | add_nums (a, b) -> a;

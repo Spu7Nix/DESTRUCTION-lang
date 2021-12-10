@@ -3,3 +3,5 @@
 ## Practical info
 
 ...
+
+## [Documentation](documentation.md)

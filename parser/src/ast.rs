@@ -11,15 +11,18 @@ type Expression = Sp<Expr>;
 
 #[derive(Debug)]
 pub enum Transformation {
-    Forced { destruct: Expr, construct: Expr },
+    Forced {
+        destruct: Expr,
+        construct: Expr,
+    },
     Compound(Vec<Transformation>),
     Try {
         first: Box<Transformation>,
         otherwise: Box<Transformation>,
-    }
+    },
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
     String,
     Number,
@@ -55,7 +58,7 @@ impl FromStr for Type {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Number(f64),
     String(String, Option<StringFlag>),
@@ -76,7 +79,7 @@ pub enum StringFlag {
     Format,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Operator {
     Add,
     Sub,
@@ -93,7 +96,7 @@ pub enum Operator {
     Ge,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOperator {
     Neg,
     Not,

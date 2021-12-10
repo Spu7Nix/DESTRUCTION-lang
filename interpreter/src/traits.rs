@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fmt::Display};
 
-use parser::{ast::Transformation, internment::LocalIntern};
+use parser::{
+    ast::{Expr, Transformation},
+    internment::LocalIntern,
+};
 
 use crate::error::RuntimeError;
 
@@ -17,7 +20,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Value::Number(n) => write!(f, "{}", n),
-            Value::String(s) => write!(f, "{}", s),
+            Value::String(s) => write!(f, "\"{}\"", s),
             Value::Array(a) => {
                 write!(f, "[")?;
                 for (i, v) in a.iter().enumerate() {
@@ -70,11 +73,18 @@ pub enum DestructResult {
     Unknown,
 }
 
+#[derive(Clone)]
+pub enum PartialStringPart {
+    String(String),
+    Expr(Expr),
+}
+
 pub enum PartialValue {
     Array {
         len: Option<usize>,
         known_elems: HashMap<usize, PartialValue>,
     },
+    //String(Vec<PartialStringPart>),
     Value(Value),
 }
 
@@ -99,6 +109,7 @@ impl PartialValue {
                 Ok(Value::Array(vals))
             }
             PartialValue::Value(v) => Ok(v.clone()),
+            //PartialValue::String(_) => todo!(),
         }
     }
 }
@@ -110,7 +121,11 @@ pub trait Structure {
         functions: &Functions,
     ) -> Result<Value, RuntimeError>;
 
-    fn destruct_to_value(&self, functions: &Functions) -> Result<DestructResult, RuntimeError>;
+    fn destruct_to_value(
+        &self,
+        functions: &Functions,
+        variables: &Variables,
+    ) -> Result<DestructResult, RuntimeError>;
 
     fn destruct(
         &self,
