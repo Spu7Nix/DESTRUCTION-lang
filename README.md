@@ -1,5 +1,10 @@
 # DESTRUCTION
 
+Documentation:
+
+- [Language](language_documentation.md)
+- [CLI](#usage-and-cli)
+
 ## Practical info
 
 ...

@@ -30,7 +30,8 @@ pub fn add_left_destruct(
             if !a2.starts_with(a1) {
                 return Err(RuntimeError::PatternMismatch(format!(
                     "Expected {} to start with {}",
-                    Value::Array(a2.clone()), Value::Array(a1.clone())
+                    Value::Array(a2.clone()),
+                    Value::Array(a1.clone())
                 )));
             }
             Value::Array(a2[a1.len()..].to_vec())
@@ -71,7 +72,8 @@ pub fn add_right_destruct(
             if !a2.ends_with(a1) {
                 return Err(RuntimeError::PatternMismatch(format!(
                     "Expected {} to end with {}",
-                    Value::Array(a2.clone()), Value::Array(a1.clone())
+                    Value::Array(a2.clone()),
+                    Value::Array(a1.clone())
                 )));
             }
             Value::Array(a2[..(a2.len() - a1.len())].to_vec())
@@ -147,7 +149,8 @@ pub fn mul_left_destruct(
             if a2.len() % a1.len() != 0 {
                 return Err(RuntimeError::PatternMismatch(format!(
                     "Length of target array {} is not divisible by length of destruct array {}",
-                    Value::Array(a2.clone()), Value::Array(a1.clone())
+                    Value::Array(a2.clone()),
+                    Value::Array(a1.clone())
                 )));
             }
             let repeats = a2.len() / a1.len();
@@ -161,7 +164,10 @@ pub fn mul_left_destruct(
         }
         (Value::String(s1), Value::String(s2)) => {
             if s2.len() % s1.len() != 0 {
-                return Err(RuntimeError::PatternMismatch(format!("Length of target string {} is not divisible by length of destruct string {}", s2, s1)));
+                return Err(RuntimeError::PatternMismatch(format!(
+                    "Length of target string {} is not divisible by length of destruct string {}",
+                    s2, s1
+                )));
             }
             let repeats = s2.len() / s1.len();
             for (i, c) in s2.bytes().enumerate() {
@@ -216,7 +222,8 @@ pub fn mul_right_destruct(
             if a2.len() % n != 0 {
                 return Err(RuntimeError::PatternMismatch(format!(
                     "Length of array {} is not divisible by number {}",
-                    Value::Array(a2.clone()), n
+                    Value::Array(a2.clone()),
+                    n
                 )));
             }
             let len = a2.len() / n;
@@ -355,12 +362,9 @@ pub fn or_destruct(
             expr.destruct(&Value::Bool(false), variables, functions)?;
             Ok(())
         }
-        (Value::Bool(true), Value::Bool(true)) => {
-            return Err(RuntimeError::ValueError(format!(
-                "Cannot destruct variable that can be either true or false",
-                
-            )))
-        }
+        (Value::Bool(true), Value::Bool(true)) => Err(RuntimeError::ValueError(
+            "Cannot destruct variable that can be either true or false".to_string(),
+        )),
         _ => {
             return Err(RuntimeError::ValueError(format!(
                 "Cannot || {} with something to get {}",
@@ -382,11 +386,10 @@ pub fn eq_destruct(
             expr.destruct(val, variables, functions)?;
             Ok(())
         }
-        Value::Bool(false) => {
-            Err(RuntimeError::ValueError(format!(
-                "Cannot destruct variable that can be any value other than {}", val,
-            )))
-        }
+        Value::Bool(false) => Err(RuntimeError::ValueError(format!(
+            "Cannot destruct variable that can be any value other than {}",
+            val,
+        ))),
         _ => {
             return Err(RuntimeError::ValueError(format!(
                 "Cannot == {} with something to get {}",

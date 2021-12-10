@@ -4,7 +4,9 @@ use parser::ast::{Transformation, Type, UnaryOperator};
 use parser::internment::LocalIntern;
 
 use crate::error::RuntimeError;
-use crate::traits::{DestructResult, Functions, Maths, PartialValue, Structure, Value, Variables};
+use crate::traits::{
+    DestructResult, Functions, Maths, PartialStringPart, PartialValue, Structure, Value, Variables,
+};
 use parser::ast::Transformation::Forced;
 use parser::ast::{Expr, TopLevel};
 
@@ -493,19 +495,19 @@ impl Structure for Expr {
             },
             Expr::Ident(i) => {
                 variables.insert(*i, value.clone())?;
-                Ok(None)
+                Ok(Some(value.clone()))
             }
             Expr::PolyIdent(i) => {
                 variables.insert_polyident(*i, value.clone())?;
-                Ok(None)
+                Ok(Some(value.clone()))
             }
 
             Expr::Operator(op, left, right) => {
                 use parser::ast::Operator::*;
                 use DestructResult::*;
                 match (
-                    left.destruct_to_value(functions)?,
-                    right.destruct_to_value(functions)?,
+                    left.destruct_to_value(functions, variables)?,
+                    right.destruct_to_value(functions, variables)?,
                 ) {
                     (
                         Known(a) | Partial(PartialValue::Value(a)),
@@ -651,6 +653,71 @@ impl Structure for Expr {
                                 )))
                             }
                         },
+                        // (PartialValue::String(a), Add) => match value {
+                        //     Value::String(v) => {
+                        //         unimplemented!()
+                        //     }
+                        //     a => {
+                        //         return Err(RuntimeError::PatternMismatch(format!(
+                        //             "Cannot add two strings to get {}",
+                        //             a
+                        //         )))
+                        //     }
+                        // },
+
+                        // (PartialValue::String(a), Mul) => match value {
+                        //     Value::String(v) => {
+                        //         let mut counter = 0;
+                        //         let mut str = v.clone();
+                        //         let mut iter = a.into_iter();
+                        //         for part in iter {
+                        //             match part {
+                        //                 PartialStringPart::String(s) => {
+                        //                     if !str.starts_with(s) {
+                        //                         return Err(RuntimeError::PatternMismatch("String does not contain the expected substring".to_string()));
+                        //                     }
+                        //                     str = str[s.len()..].to_string();
+                        //                 }
+                        //                 PartialStringPart::Expr(mut e) => {
+                        //                     let mut next = iter.next();
+                        //                     if next.is_none() {
+                        //                         e.destruct(
+                        //                             &Value::String(str),
+                        //                             variables,
+                        //                             functions,
+                        //                         );
+                        //                     } else {
+                        //                         while let Some(PartialStringPart::Expr(e2)) = next {
+                        //                             e = Expr::Operator(
+                        //                                 parser::ast::Operator::Add,
+                        //                                 Box::new(e),
+                        //                                 Box::new(e2),
+                        //                             );
+                        //                             next = iter.next();
+                        //                         }
+                        //                         if let Some(PartialStringPart::String(s)) = next {
+                        //                             e.destruct(
+                        //                                 &Value::String(str),
+                        //                                 variables,
+                        //                                 functions,
+                        //                             );
+                        //                             str = str[s.len()..].to_string();
+                        //                         } else {
+                        //                             unreachable!();
+                        //                         }
+                        //                     }
+                        //                 }
+                        //             }
+                        //         }
+                        //         todo!()
+                        //     }
+                        //     a => {
+                        //         return Err(RuntimeError::PatternMismatch(format!(
+                        //             "Cannot multiply string to get {}",
+                        //             a
+                        //         )))
+                        //     }
+                        // },
                         _ => Err(RuntimeError::ValueError(
                             "Cannot destruct expression with two unknowns".to_string(),
                         )),
@@ -706,7 +773,7 @@ impl Structure for Expr {
                 val.destruct(&target_value, variables, functions)
             }
             Expr::Any => Ok(None),
-            Expr::Call(f, a) => match a.destruct_to_value(functions)? {
+            Expr::Call(f, a) => match a.destruct_to_value(functions, variables)? {
                 DestructResult::Known(v) => Ok(Some(run_func(*f, v, functions)?)),
                 _ => {
                     let target_val = reverse_run_func(*f, value.clone(), functions)?;
@@ -716,7 +783,11 @@ impl Structure for Expr {
         }
     }
 
-    fn destruct_to_value(&self, functions: &Functions) -> Result<DestructResult, RuntimeError> {
+    fn destruct_to_value(
+        &self,
+        functions: &Functions,
+        variables: &Variables,
+    ) -> Result<DestructResult, RuntimeError> {
         use DestructResult::*;
         match &self {
             Expr::Number(n) => Ok(Known(Value::Number(*n))),
@@ -726,7 +797,7 @@ impl Structure for Expr {
                 let mut arr_val = Vec::new();
                 let mut known = true;
                 for e in arr {
-                    let val = e.destruct_to_value(functions)?;
+                    let val = e.destruct_to_value(functions, variables)?;
                     if let Unknown = val {
                         known = false;
                     }
@@ -755,7 +826,7 @@ impl Structure for Expr {
                 let mut arr_val = Vec::new();
                 let mut known = true;
                 for e in t {
-                    let val = e.destruct_to_value(functions)?;
+                    let val = e.destruct_to_value(functions, variables)?;
                     if let Unknown = val {
                         known = false;
                         break;
@@ -770,16 +841,31 @@ impl Structure for Expr {
                     Ok(Unknown)
                 }
             }
-            Expr::Ident(i) => Ok(Unknown),
-            Expr::PolyIdent(i) => Ok(Unknown),
+            Expr::Ident(i) => {
+                if let Some(v) = variables.get(*i) {
+                    Ok(Known(v.clone()))
+                } else {
+                    Ok(Unknown)
+                }
+            }
+            Expr::PolyIdent(i) => {
+                if let Some(v) = variables.get(*i) {
+                    Ok(Known(v.clone()))
+                } else {
+                    Ok(Unknown)
+                }
+            }
 
             Expr::Operator(op, left, right) => {
                 use parser::ast::Operator::*;
                 match (
-                    left.destruct_to_value(functions)?,
-                    right.destruct_to_value(functions)?,
+                    left.destruct_to_value(functions, variables)?,
+                    right.destruct_to_value(functions, variables)?,
                 ) {
-                    (Known(a), Known(b)) => {
+                    (
+                        Known(a) | Partial(PartialValue::Value(a)),
+                        Known(b) | Partial(PartialValue::Value(b)),
+                    ) => {
                         // incase some patterns both destruct and give a value (like @ in rust)
                         let res = match op {
                             Add => a.add(&b)?,
@@ -817,15 +903,70 @@ impl Structure for Expr {
                         Ok(Known(res))
                     }
 
+                    // (Partial(PartialValue::String(a)), Partial(PartialValue::String(b))) => {
+                    //     if let Add = op {
+                    //         let mut out = a;
+                    //         out.extend(b);
+                    //         Ok(Partial(PartialValue::String(out)))
+                    //     } else {
+                    //         Err(RuntimeError::ValueError(format!(
+                    //             "Cannot apply operator {:?} to two strings",
+                    //             op
+                    //         )))
+                    //     }
+                    // }
+
+                    // (
+                    //     Partial(PartialValue::String(a)),
+                    //     Known(b) | Partial(PartialValue::Value(b)),
+                    // ) => match (op, b) {
+                    //     (Mul, Value::Number(n)) => {
+                    //         if n.fract() != 0.0 {
+                    //             return Err(RuntimeError::ValueError(format!(
+                    //                 "Cannot multiply string by non-integer {}",
+                    //                 n
+                    //             )));
+                    //         }
+                    //         let mut out = Vec::new();
+                    //         for _ in 0..(n as usize) {
+                    //             out.extend(a.clone());
+                    //         }
+                    //         Ok(Partial(PartialValue::String(out)))
+                    //     }
+                    //     (Add, Value::String(s)) => {
+                    //         let mut out = a;
+                    //         out.push(PartialStringPart::String(s));
+                    //         Ok(Partial(PartialValue::String(out)))
+                    //     }
+                    //     (op, b) => Err(RuntimeError::ValueError(format!(
+                    //         "Cannot apply operator {:?} to string and {}",
+                    //         op, b
+                    //     ))),
+                    // },
+
+                    // (
+                    //     Known(a) | Partial(PartialValue::Value(a)),
+                    //     Partial(PartialValue::String(b)),
+                    // ) => match (op, a) {
+                    //     (Add, Value::String(s)) => {
+                    //         let mut out = vec![PartialStringPart::String(s)];
+                    //         out.extend(b);
+                    //         Ok(Partial(PartialValue::String(out)))
+                    //     }
+                    //     (op, a) => Err(RuntimeError::ValueError(format!(
+                    //         "Cannot apply operator {:?} to string and {}",
+                    //         op, a
+                    //     ))),
+                    // },
                     _ => Ok(Unknown),
                 }
             }
-            Expr::Cast(exp, to, from) => match exp.destruct_to_value(functions)? {
+            Expr::Cast(exp, to, from) => match exp.destruct_to_value(functions, variables)? {
                 Known(v) => Ok(Known(v.cast(from, to)?)),
                 _ => Ok(Unknown),
             },
             Expr::UnaryOp(op, val) => {
-                match (op, val.destruct_to_value(functions)?) {
+                match (op, val.destruct_to_value(functions, variables)?) {
                     // -x = n
                     (UnaryOperator::Neg, Known(Value::Number(n))) => Ok(Known(Value::Number(-n))),
                     // !x = b
@@ -838,7 +979,7 @@ impl Structure for Expr {
                 }
             }
             Expr::Any => Ok(Unknown),
-            Expr::Call(f, a) => match a.destruct_to_value(functions)? {
+            Expr::Call(f, a) => match a.destruct_to_value(functions, variables)? {
                 Known(v) => Ok(Known(run_func(*f, v, functions)?)), // run function normally because the value is known
                 _ => Ok(Unknown),
             }, // ??
