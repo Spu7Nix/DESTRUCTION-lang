@@ -39,9 +39,9 @@ You can chain multiple tranformations together with a `|` symbol, like this:
 In DESTRUCTION, a transformation is always _symmetrical_. This means that:
 
 - all possible constructing patterns can also be destructuring patterns, and vice versa
-- any tranformations where the left side is equal to the right side will do nothing
+- any tranformation where the left side is equal to the right side will do nothing
 
-From now on, it's useful to think about constructing patterns as functions that take a number of inputs and outputs the constructed datastructure, and destructuring patterns as a way to _run such a function in reverse_, aka. use the output value to determine the input values. With this expanded definition we gain a lot of nwe abilities, for example, we can now also destructure **mathematical operations**:
+From now on, it's useful to think about constructing patterns as functions that take a number of inputs and outputs the constructed datastructure, and destructuring patterns as a way to _run such a function in reverse_, aka. use the output value to determine the input values. With this expanded definition we gain a lot of new abilities, for example, we can now also destructure **mathematical operations**:
 
 ```js
 // input is 60
@@ -126,13 +126,13 @@ TODO
 
 ## Datatypes / Datastructures
 
-| name    | syntax                    | example                                  |
-| ------- | ------------------------- | ---------------------------------------- |
-| number  |                           | `100`, `-10`, `3.14159`                  |
-| string  | `"[content]"`             | `"Hello"`                                |
-| boolean |                           | `true`, `false`                          |
-| array   | `[element, element, ...]` | `[1, 2, 3]`, `[["hello"], 1, 2, []]`     |
-| tuple   | `(element, element, ...)` | `(1, 2, 3)`, `(("hello", "world), 1, 2)` |
+| name    | syntax                    | example                                   |
+| ------- | ------------------------- | ----------------------------------------- |
+| number  |                           | `100`, `-10`, `3.14159`                   |
+| string  | `"[content]"`             | `"Hello"`                                 |
+| boolean |                           | `true`, `false`                           |
+| array   | `[element, element, ...]` | `[1, 2, 3]`, `[["hello"], 1, 2, []]`      |
+| tuple   | `(element, element, ...)` | `(1, 2, 3)`, `(("hello", "world"), 1, 2)` |
 
 ## Operators
 
