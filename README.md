@@ -32,9 +32,9 @@ Happy DESTRUCTION-ing!
 
 ### Run examples
 
-Basic hello world: `cargo run build examples/greet.ds --input world`
-Fibonacci: `cargo run build examples/fibonacci.ds --input 10` (the input is the number of fibonacci numbers to output)
-Sorting: `cargo run build examples/sort.ds`
+Basic hello world: `cargo run build examples/greet.ds --input world`  
+Fibonacci: `cargo run build examples/fibonacci.ds --input 10` (the input is the number of fibonacci numbers to output)  
+Sorting: `cargo run build examples/sort.ds`  
 
 ### CLI docs
 
