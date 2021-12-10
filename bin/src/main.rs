@@ -5,8 +5,8 @@ use clap::{App, Arg, SubCommand};
 use parser::parser::Lexer;
 
 fn main() {
-    let matches = App::new("pootis name here")
-        .bin_name("language")
+    let matches = App::new("DESTRUCTION")
+        .bin_name("DESTRUCTION")
         .author("krista-chan <qbotdev84@gmail.com>, spu7nix <main@spu7nix.net>, flow, camila314") // put emails here
         .version("v0.0.0")
         .about("Langjam0002 entry")

@@ -11,7 +11,7 @@ assert_eq!(d, 4);
 
 Our language, **DESTRUCTION**, explores how this feature can be expanded, and it also explores how destructuring patterns could be a core mechanic of a language.
 
-# Transformations
+## Transformations
 
 In a DESTRUCTION program, the state of the program is always a single value. At the start of the program this value is the command line input, and at the end this value will be outputted to the console. The program itself consists of a series of _transformations_ that transform the value to the desired output. A transformation has two parts:
 
@@ -34,7 +34,7 @@ You can chain multiple tranformations together with a `|` symbol, like this:
 
 > If the current value does not fit the given destructuring pattern, the interpreter will stop and print an error
 
-# Symmetry
+## Symmetry
 
 In DESTRUCTION, a transformation is always _symmetrical_. This means that:
 
@@ -59,7 +59,7 @@ In DESTRUCTION, you can also use the operators `+` and `*` on strings and arrays
 
 > To understand this better, you can imagine how the transformation would not change the value if the right side was the same expression as the left, for example `n * 10 -> n * 10` would first extract `n` as 6, and then construct it back to 60 on the right side
 
-# Conditional transformations
+## Conditional transformations
 
 A _conditional transformation_ consists of two sub-transformations. It will first try to transform the current value using the first transformation, but if the value doesn't fit the first transformation's destructuring pattern, it will run the other transformation instead.
 
@@ -79,7 +79,7 @@ Conditional transformations are just as much a transformation as normal ones, an
 :  trans4
 ```
 
-# Functions
+## Functions
 
 An actual DESTRUCTION file is a collection of functions, where the `main` function is the entry point. You can define functions with this syntax:
 
@@ -118,13 +118,13 @@ test1 :=
 test2 := _ -> add_nums (10, 10); // returns 20
 ```
 
-# Polyvalues
+## Polyvalues
 
 TODO
 
-# Reference
+## Reference
 
-## Datatypes / Datastructures
+### Datatypes / Datastructures
 
 | name    | syntax                    | example                                   |
 | ------- | ------------------------- | ----------------------------------------- |
@@ -134,7 +134,7 @@ TODO
 | array   | `[element, element, ...]` | `[1, 2, 3]`, `[["hello"], 1, 2, []]`      |
 | tuple   | `(element, element, ...)` | `(1, 2, 3)`, `(("hello", "world"), 1, 2)` |
 
-## Operators
+### Operators
 
 | symbol | syntax     | datatypes                                                                                                | description                                                                    | example                                                                          |
 | ------ | ---------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
