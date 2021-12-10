@@ -1,3 +1,4 @@
+// parse input
 main := n::#number~>#string -> factorial (n, n - 1);
 
 factorial := 
