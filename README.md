@@ -20,11 +20,11 @@ Notes: You must have rust installed from the official [rust-lang](https://www.ru
 - Clone the github repository:
 
 ```sh
-$ git clone https://github.com/Spu7Nix/langjam2.git
-Cloned https://github.com/Spu7Nix/langjam2.git into langjam2
+$ git clone https://github.com/Spu7Nix/DESTRUCTION-lang.git
+Cloned https://github.com/Spu7Nix/DESTRUCTION-lang.git into DESTRUCTION-lang
 ```
 
-- `cd` into `./langjam2` and run the following:
+- `cd` into `./DESTRUCTION-lang` and run the following:
 
 ```sh
 cargo run -- [command goes here] # Commands are documented below
