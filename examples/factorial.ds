@@ -1,0 +1,5 @@
+main := n::#number~>#string -> factorial (n, n - 1);
+
+factorial := 
+    ? (a, 1) -> a
+    : (a, f) -> factorial (a * f, f - 1);

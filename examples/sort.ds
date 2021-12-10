@@ -1,4 +1,8 @@
-main := _ -> sort [1, 5, 129, 20, 10, 2, -10, 0, 1, 5];
+main := 
+    // parse input
+    a -> a / ", "
+    | [*a] * n -> [*a::#string~>#number] * n
+    | arr -> sort arr;
 
 sort := 
     ?  [el] -> [el]
