@@ -287,6 +287,56 @@ pub fn div_left_destruct(
         // n1 / x = n2
         (Value::Number(n1), Value::Number(n2)) => Value::Number(n1 / n2),
 
+        (Value::String(s1), Value::Array(arr)) => {
+            // arr is a list of substrings in the order they appear in in s1
+            // s1 has the same substrings, but delimitered by a specific substring
+            // find the delimiter substring
+
+            let mut strings = Vec::new();
+
+            for el in arr {
+                match el {
+                    Value::String(s) => strings.push(s.clone()),
+                    a => {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Cannot divide string by array containing non-string {}",
+                            a
+                        )))
+                    }
+                }
+            }
+
+            if !s1.starts_with(&strings[0]) {
+                return Err(RuntimeError::PatternMismatch(format!(
+                    "First element of array {} is not a prefix of string {}",
+                    Value::Array(arr.clone()),
+                    Value::String(s1.clone())
+                )));
+            }
+
+            let rest = &s1[strings[0].len()..];
+
+            // find the second element of the array in the `rest` string
+            let mut i = 0;
+            while i < rest.len() {
+                if rest[i..].starts_with(&strings[1]) {
+                    break;
+                }
+                i += 1;
+            }
+            let delim = &rest[0..i];
+
+            if &strings.join(delim) != s1 {
+                return Err(RuntimeError::PatternMismatch(format!(
+                    "Cannot find delimiter that fits between array {} and string {}",
+                    Value::Array(arr.clone()),
+                    Value::String(s1.clone())
+                )));
+            }
+
+            Value::String(delim.to_string())
+        }
+
         _ => {
             return Err(RuntimeError::ValueError(format!(
                 "Cannot divide {} with something to get {}",
@@ -308,6 +358,24 @@ pub fn div_right_destruct(
     let target_val = match (right, target_val) {
         // x / n1 = n2
         (Value::Number(n1), Value::Number(n2)) => Value::Number(n1 * n2),
+
+        (Value::String(delim), Value::Array(arr)) => {
+            let mut strings = Vec::new();
+
+            for el in arr {
+                match el {
+                    Value::String(s) => strings.push(s.clone()),
+                    a => {
+                        return Err(RuntimeError::ValueError(format!(
+                            "Cannot divide string by array containing non-string {}",
+                            a
+                        )))
+                    }
+                }
+            }
+
+            Value::String(strings.join(delim))
+        }
 
         _ => {
             return Err(RuntimeError::ValueError(format!(

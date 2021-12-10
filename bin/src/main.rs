@@ -26,7 +26,7 @@ fn main() {
                         .short("i")
                         .long("input")
                         .takes_value(true)
-                        .required(true),
+                        .required(false),
                 ),
         )
         .subcommand(
@@ -78,7 +78,7 @@ fn main() {
 
         let evaled = match interpreter::interpret::interpret(
             parsed,
-            interpreter::traits::Value::String(m.value_of("input").unwrap().to_string()),
+            interpreter::traits::Value::String(m.value_of("input").unwrap_or("").to_string()),
         ) {
             Ok(v) => v,
             Err(e) => {

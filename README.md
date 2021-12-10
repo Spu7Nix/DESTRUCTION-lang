@@ -15,7 +15,7 @@ Documentation:
 
 Notes: You must have rust installed from the official [rust-lang](https://www.rust-lang.org/tools/install) site; There are installation steps on the site.
 
-- Clone the github repository:  
+- Clone the github repository:
 
 ```sh
 $ git clone https://github.com/Spu7Nix/langjam2.git
@@ -29,6 +29,12 @@ cargo run -- [command goes here] # Commands are documented below
 ```
 
 Happy DESTRUCTION-ing!
+
+### Run examples
+
+Basic hello world: `cargo run build examples/greet.ds --input world`
+Fibonacci: `cargo run build examples/fibonacci.ds --input 10` (the input is the number of fibonacci numbers to output)
+Sorting: `cargo run build examples/sort.ds`
 
 ### CLI docs
 

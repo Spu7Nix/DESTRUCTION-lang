@@ -81,6 +81,12 @@ impl Maths for Value {
     fn div(&self, other: &Self) -> Result<Value, RuntimeError> {
         match (self, other) {
             (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs / rhs)),
+            (Value::String(lhs), Value::String(rhs)) => Ok(Value::Array(
+                lhs.to_owned()
+                    .split(rhs)
+                    .map(|a| Value::String(a.to_string()))
+                    .collect(),
+            )),
             _ => Err(RuntimeError::ValueError(format!(
                 "Cannot divide {:?} and {:?}",
                 self, other
